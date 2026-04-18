@@ -58,5 +58,6 @@ Voir `docker-compose.monitoring.yml` et `monitoring/README.md` pour **Prometheus
 
 ## Dépannage
 
+- **`502 Bad Gateway` … `dockerDesktopLinuxEngine` … `containers/create`** (souvent sur Keycloak en premier) : problème **Docker Desktop**, pas le compose. Quitter Docker Desktop complètement, rouvrir, attendre que l’icône soit stable ; puis `docker ps`. Si ça persiste : `wsl --shutdown` (PowerShell admin), relancer Docker Desktop ; en dernier recours augmenter la **RAM / CPU** alloués à Docker (Settings → Resources) ou mettre à jour Docker Desktop.
 - **MS en boucle `restart`** : attendre que Config Server et Eureka soient up ; vérifier les logs `docker compose ... logs msetudiant4twin6`.
 - **401 sur les MS** : vérifier que Keycloak est healthy et que l’issuer JWT correspond (`host.docker.internal` vs `localhost`).
