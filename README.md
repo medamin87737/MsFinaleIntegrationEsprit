@@ -9,8 +9,9 @@
 
 | Besoin | Fichier / commande |
 |--------|--------------------|
-| Infra seule (Keycloak, Mongo, RabbitMQ) | `docker compose up -d` dans `MS/` |
-| **Stack complète** (Eureka, Config, Gateway, MS, MSNotes) | [`DOCKER-FULLSTACK.md`](./DOCKER-FULLSTACK.md) |
+| **Stack complète** (Eureka, Config, Gateway, tous les MS, MSNotes, Keycloak, Mongo, RabbitMQ) | Dans `MS/` : `docker compose up -d --build` — détail [`DOCKER-FULLSTACK.md`](./DOCKER-FULLSTACK.md) |
+| Infra seule (Keycloak, Mongo, Rabbit — MS depuis l’IDE) | `docker compose -f docker-compose.infra.yml up -d` |
+| Déploiement AWS (grille + BDs managées) | [`aws/DEPLOY-AWS.md`](./aws/DEPLOY-AWS.md) |
 | Tests JWT / Keycloak | [`TESTING.md`](./TESTING.md) |
 | **Swagger agrégé** (gateway) | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) (gateway locale) |
 | Scénarios grille (Feign + RabbitMQ) | [`EVALUATION-SCENARIOS.md`](./EVALUATION-SCENARIOS.md) |

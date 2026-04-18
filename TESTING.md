@@ -14,7 +14,7 @@ Ce document décrit comment valider l’intégration Keycloak de bout en bout av
 Depuis le dossier `MS` :
 
 ```bash
-docker compose up -d keycloak
+docker compose -f docker-compose.infra.yml up -d keycloak
 ```
 
 Attendre que le conteneur soit prêt (premier démarrage + import du realm peut prendre 1 à 2 minutes).
@@ -27,7 +27,7 @@ Ouvrir dans le navigateur :
 
 Si la page JSON s’affiche, le realm **school-realm** est bien chargé.
 
-Console d’administration Keycloak : [http://localhost:8180](http://localhost:8180) (utilisateur admin Keycloak : `admin` / `admin`, défini dans `docker-compose.yml`).
+Console d’administration Keycloak : [http://localhost:8180](http://localhost:8180) (utilisateur admin Keycloak : `admin` / `admin`, défini dans `docker-compose.infra.yml` et la stack complète).
 
 ## 3. Tester le login frontend (flux PKCE)
 

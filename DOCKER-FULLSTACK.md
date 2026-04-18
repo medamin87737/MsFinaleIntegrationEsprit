@@ -1,6 +1,8 @@
 # Stack Docker complète (Twin6 Campus)
 
-Ce fichier complète `docker-compose.yml` (infra légère : Keycloak, MongoDB, RabbitMQ) avec **`docker-compose.full-stack.yml`** : Eureka, Config Server, API Gateway, les cinq microservices Spring, et MSNotes (NestJS).
+Le fichier **`docker-compose.full-stack.yml`** décrit la stack **complète** : Eureka, Config Server, API Gateway, les cinq microservices Spring, MSNotes (NestJS), Keycloak, MongoDB et RabbitMQ.
+
+À la racine `MS/`, **`docker-compose.yml`** inclut ce fichier : un simple `docker compose up -d --build` lance **tout**. Pour **seulement** Keycloak + Mongo + RabbitMQ (MS lancés depuis l’IDE), utilisez **`docker-compose.infra.yml`**.
 
 ## Prérequis
 
@@ -14,9 +16,11 @@ Ce fichier complète `docker-compose.yml` (infra légère : Keycloak, MongoDB, R
 
 ```bash
 cd MS
-docker compose -f docker-compose.full-stack.yml build
-docker compose -f docker-compose.full-stack.yml up -d
+docker compose build
+docker compose up -d
 ```
+
+(Équivalent : `docker compose -f docker-compose.full-stack.yml build && docker compose -f docker-compose.full-stack.yml up -d`.)
 
 La première montée peut prendre **plusieurs minutes** (Maven dans les images Spring).
 
