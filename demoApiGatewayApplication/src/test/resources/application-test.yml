@@ -1,0 +1,8 @@
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+spring:
+  cloud:
+    discovery:
+      enabled: false

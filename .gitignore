@@ -1,0 +1,49 @@
+# Maven / Java
+**/target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
+*.jar
+!**/src/test/**/resources/**/*.jar
+.mvn/wrapper/maven-wrapper.jar
+
+# Node / Nest / Vite
+**/node_modules/
+**/dist/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env & secrets locaux
+.env
+.env.*.local
+*.pem
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+
+# Bases H2 locales (ne pas versionner les fichiers binaires)
+**/Database/**/*.mv.db
+**/Database/**/*.trace.db
+
+# Docker / local volumes (si générés à la racine)
+*.local.yml

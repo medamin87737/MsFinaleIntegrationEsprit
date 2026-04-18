@@ -1,0 +1,34 @@
+/* Thème aligné sur le portail Twin6 (accent #d7263d, fond clair) */
+body.login-pf {
+  background: linear-gradient(160deg, #f8f6f6 0%, #fff5f5 45%, #f8f6f6 100%) !important;
+}
+
+.pf-v5-c-login__main {
+  border-radius: 18px;
+  box-shadow: 0 22px 50px rgba(18, 18, 18, 0.1);
+  border: 1px solid rgba(18, 18, 18, 0.08);
+}
+
+.pf-v5-c-login__header {
+  border-bottom: 1px solid rgba(215, 38, 61, 0.15);
+}
+
+.pf-v5-c-login__title {
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+}
+
+.pf-v5-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-primary:hover {
+  background: linear-gradient(135deg, #d7263d 0%, #a01828 100%) !important;
+  border-color: #8b1022 !important;
+  box-shadow: 0 10px 28px rgba(215, 38, 61, 0.35);
+}
+
+.pf-v5-c-form-control {
+  border-radius: 10px !important;
+}
+
+.pf-v5-c-login__footer {
+  color: #5c5c5c;
+}

@@ -1,18 +1,33 @@
 package tn.esprit.spring.mssalle4twin6;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import tn.esprit.spring.mssalle4twin6.dto.SalleAvecClasseDto;
+import tn.esprit.spring.mssalle4twin6.dto.SalleAvecMatieresDto;
 
 import java.util.List;
 
+@RefreshScope
 @RestController
 @RequestMapping("/salles")
 public class SalleController {
 
     private final ISalleService service;
 
+    @Value("${welcome.message}")
+    private String welcomeMessage;
+
     public SalleController(ISalleService service) {
         this.service = service;
+    }
+
+    @GetMapping("/welcome")
+    public String welcome() {
+        return welcomeMessage;
     }
 
     @GetMapping
@@ -27,12 +42,36 @@ public class SalleController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /**
+     * Scénario OpenFeign : salle + libellé classe récupéré sur MSClasse4twin6.
+     */
+    @GetMapping("/{id}/avec-libelle-classe")
+    public ResponseEntity<SalleAvecClasseDto> getAvecLibelleClasse(
+            @PathVariable Long id,
+            @RequestParam Long classeId) {
+        return service.getAvecLibelleClasse(id, classeId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Scénario OpenFeign : salle + matières dédiées avec les horaires de séance.
+     */
+    @GetMapping("/{id}/matieres-dediees")
+    public ResponseEntity<SalleAvecMatieresDto> getSalleAvecMatieres(@PathVariable Long id) {
+        return service.getSalleAvecMatieres(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
     public ResponseEntity<Salle> create(@RequestBody Salle entity) {
         return ResponseEntity.ok(service.create(entity));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
     public ResponseEntity<Salle> update(@PathVariable Long id, @RequestBody Salle entity) {
         return service.update(id, entity)
                 .map(ResponseEntity::ok)
@@ -40,6 +79,7 @@ public class SalleController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

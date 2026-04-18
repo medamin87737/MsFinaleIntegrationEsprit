@@ -1,0 +1,280 @@
+{
+  "id": "school-realm",
+  "realm": "school-realm",
+  "loginTheme": "twin6-campus",
+  "accountTheme": "twin6-campus",
+  "displayName": "School Twin6",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "id": "realm-role-chef",
+        "name": "ROLE_CHEF_ENSEIGNANT",
+        "description": "Chef enseignant — accès administrateur total",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "school-realm"
+      },
+      {
+        "id": "realm-role-enseignant",
+        "name": "ROLE_ENSEIGNANT",
+        "description": "Enseignant — accès à ses classes et notes",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "school-realm"
+      },
+      {
+        "id": "realm-role-etudiant",
+        "name": "ROLE_ETUDIANT",
+        "description": "Étudiant — lecture de ses propres données",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "school-realm"
+      },
+      {
+        "id": "realm-role-offline",
+        "name": "offline_access",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "school-realm"
+      },
+      {
+        "id": "realm-role-uma",
+        "name": "uma_authorization",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "school-realm"
+      }
+    ]
+  },
+  "defaultDefaultClientScopes": [
+    "role_list",
+    "profile",
+    "email",
+    "roles",
+    "web-origins",
+    "acr"
+  ],
+  "defaultOptionalClientScopes": [
+    "offline_access",
+    "address",
+    "phone",
+    "microprofile-jwt"
+  ],
+  "clients": [
+    {
+      "id": "client-school-frontend",
+      "clientId": "school-frontend",
+      "name": "school-frontend",
+      "description": "SPA React (PKCE)",
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "http://localhost:5173",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "school-enseignant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "schoolEnseignantId",
+            "claim.name": "school_enseignant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "school-etudiant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "schoolEtudiantId",
+            "claim.name": "school_etudiant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "client-school-gateway",
+      "clientId": "school-gateway",
+      "name": "school-gateway",
+      "description": "Client confidentiel (machine-to-machine)",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "schoolGatewaySecretDev2024",
+      "redirectUris": ["http://localhost:8080/*"],
+      "webOrigins": ["*"],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {},
+      "protocolMappers": [],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "user-chef-test",
+      "username": "chef.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Chef",
+      "lastName": "Test",
+      "email": "chef@school.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "chef123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_CHEF_ENSEIGNANT",
+        "offline_access",
+        "uma_authorization"
+      ],
+      "attributes": {
+        "schoolEnseignantId": ["1"]
+      },
+      "requiredActions": []
+    },
+    {
+      "id": "user-ens-test",
+      "username": "enseignant.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Enseignant",
+      "lastName": "Test",
+      "email": "ens@school.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ens123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_ENSEIGNANT",
+        "offline_access",
+        "uma_authorization"
+      ],
+      "attributes": {
+        "schoolEnseignantId": ["1"]
+      },
+      "requiredActions": []
+    },
+    {
+      "id": "user-etu-test",
+      "username": "etudiant.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Étudiant",
+      "lastName": "Test",
+      "email": "etu@school.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "etu123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_ETUDIANT",
+        "offline_access",
+        "uma_authorization"
+      ],
+      "attributes": {
+        "schoolEtudiantId": ["1"]
+      },
+      "requiredActions": []
+    },
+    {
+      "id": "user-service-gateway",
+      "username": "service-account-school-gateway",
+      "enabled": true,
+      "serviceAccountClientId": "school-gateway",
+      "realmRoles": [
+        "ROLE_CHEF_ENSEIGNANT",
+        "ROLE_ENSEIGNANT",
+        "offline_access",
+        "uma_authorization"
+      ],
+      "credentials": []
+    }
+  ],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "referrerPolicy": "no-referrer",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+  "components": {}
+}

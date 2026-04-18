@@ -18,6 +18,21 @@ public class DemoApiGatewayApplication {
     @Bean
     public RouteLocator gatwayroutes(RouteLocatorBuilder builder) {
         return builder.routes()
+                .route("central-docs-MSEtudiant4twin6", r -> r.path("/central-docs/MSEtudiant4twin6/**")
+                        .filters(f -> f.rewritePath("/central-docs/MSEtudiant4twin6/(?<path>.*)", "/${path}"))
+                        .uri("lb://MSEtudiant4twin6"))
+                .route("central-docs-MSClasse4twin6", r -> r.path("/central-docs/MSClasse4twin6/**")
+                        .filters(f -> f.rewritePath("/central-docs/MSClasse4twin6/(?<path>.*)", "/${path}"))
+                        .uri("lb://MSClasse4twin6"))
+                .route("central-docs-MSMatiere4twin6", r -> r.path("/central-docs/MSMatiere4twin6/**")
+                        .filters(f -> f.rewritePath("/central-docs/MSMatiere4twin6/(?<path>.*)", "/${path}"))
+                        .uri("lb://MSMatiere4twin6"))
+                .route("central-docs-MSSalle4twin6", r -> r.path("/central-docs/MSSalle4twin6/**")
+                        .filters(f -> f.rewritePath("/central-docs/MSSalle4twin6/(?<path>.*)", "/${path}"))
+                        .uri("lb://MSSalle4twin6"))
+                .route("central-docs-MSEnseignant4twin6", r -> r.path("/central-docs/MSEnseignant4twin6/**")
+                        .filters(f -> f.rewritePath("/central-docs/MSEnseignant4twin6/(?<path>.*)", "/${path}"))
+                        .uri("lb://MSEnseignant4twin6"))
                 .route("candidats_example_route", r -> r.path("/candidats/**")
                         .uri("lb://MSCandidat4twin6"))
                 .route("etudiants_route", r -> r.path("/etudiants/**")
@@ -30,6 +45,8 @@ public class DemoApiGatewayApplication {
                         .uri("lb://MSMatiere4twin6"))
                 .route("salles_route", r -> r.path("/salles/**")
                         .uri("lb://MSSalle4twin6"))
+                .route("notes_route", r -> r.path("/notes/**")
+                        .uri("lb://MSNotes4twin6"))
         .build();
 
     }}
