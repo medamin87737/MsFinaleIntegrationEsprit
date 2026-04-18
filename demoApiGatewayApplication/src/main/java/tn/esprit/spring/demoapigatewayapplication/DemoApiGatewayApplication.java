@@ -33,8 +33,6 @@ public class DemoApiGatewayApplication {
                 .route("central-docs-MSEnseignant4twin6", r -> r.path("/central-docs/MSEnseignant4twin6/**")
                         .filters(f -> f.rewritePath("/central-docs/MSEnseignant4twin6/(?<path>.*)", "/${path}"))
                         .uri("lb://MSEnseignant4twin6"))
-                .route("candidats_example_route", r -> r.path("/candidats/**")
-                        .uri("lb://MSCandidat4twin6"))
                 .route("etudiants_route", r -> r.path("/etudiants/**")
                         .uri("lb://MSEtudiant4twin6"))
                 .route("enseignants_route", r -> r.path("/enseignants/**")
@@ -48,5 +46,5 @@ public class DemoApiGatewayApplication {
                 .route("notes_route", r -> r.path("/notes/**")
                         .uri("lb://MSNotes4twin6"))
         .build();
-
-    }}
+    }
+}
