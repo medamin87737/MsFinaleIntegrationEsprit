@@ -13,7 +13,8 @@ x-extra-hosts: &extra_hosts
   - "host.docker.internal:host-gateway"
 
 x-spring-cloud-env: &spring_cloud
-  SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+  # Évite les imports en double (localhost + config-server) : une seule URI surchargée en Docker.
+  SPRING_CLOUD_CONFIG_URI: http://config-server:8888
   EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka:8761/eureka
   SPRING_RABBITMQ_HOST: rabbitmq
   KEYCLOAK_ISSUER_URI: http://host.docker.internal:8180/realms/school-realm

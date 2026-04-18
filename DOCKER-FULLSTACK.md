@@ -47,7 +47,7 @@ Les autres MS **ne publient pas** de port : ils sont joignables **via la gateway
 
 ## Variables importantes (déjà injectées dans le compose)
 
-- `SPRING_CONFIG_IMPORT` → `http://config-server:8888`
+- `SPRING_CLOUD_CONFIG_URI` → `http://config-server:8888` (les MS utilisent `spring.config.import=optional:configserver:` + `spring.cloud.config.uri` en local)
 - `EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE` → `http://eureka:8761/eureka`
 - `SPRING_RABBITMQ_HOST` → `rabbitmq`
 - `KEYCLOAK_*` → `http://host.docker.internal:8180/...` (cohérent avec les tokens émis pour le navigateur sur `localhost:8180`)
