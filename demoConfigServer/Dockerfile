@@ -2,9 +2,8 @@ FROM maven:3.9.8-eclipse-temurin-17 AS build
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src
-COPY .mvn .mvn
-COPY mvnw mvnw.cmd ./
-RUN chmod +x mvnw && ./mvnw -q -DskipTests package
+# Pas de mvnw dans ce module : utiliser Maven fourni par l’image de base.
+RUN mvn -q -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
