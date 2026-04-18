@@ -16,6 +16,9 @@ RUN mvn -q -B -pl "${MS_MODULE}" -am -DskipTests package
 FROM eclipse-temurin:17-jre-alpine
 ARG MS_MODULE
 WORKDIR /app
-COPY --from=build /build/${MS_MODULE}/target/*.jar /app/app.jar
+# Spring Boot émet 2 JAR (*-plain.jar + fat). Ne pas copier *.jar vers un seul fichier (JAR corrompu).
+COPY --from=build /build/${MS_MODULE}/target/ /tmp/target/
+RUN JAR="$(find /tmp/target -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n1)" && \
+    test -n "$JAR" && mv "$JAR" /app/app.jar && rm -rf /tmp/target
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
