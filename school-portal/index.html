@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
     <title>Twin6 Campus — Portail</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,6 +14,23 @@
     />
   </head>
   <body>
+    <!--
+      OAuth / Keycloak : la redirection de login doit être en fenêtre de premier niveau.
+      Les aperçus IDE / onglets « Simple Browser » chargent souvent la page dans un cadre :
+      erreur « Unsafe attempt to load URL … from frame » + chrome-error://chromewebdata.
+      Ce script synchrone s’exécute avant tout module Vite / keycloak-js.
+    -->
+    <script>
+      (function () {
+        try {
+          if (window.self !== window.top) {
+            window.top.location.replace(window.location.href);
+          }
+        } catch (e) {
+          window.__TWIN6_IFRAME_BLOCKED__ = true;
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

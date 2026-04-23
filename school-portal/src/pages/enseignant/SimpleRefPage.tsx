@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import PrivilegeHint from '../../components/PrivilegeHint';
 import { useEnseignantApi } from '../../hooks/useEnseignantApi';
 import { useEnseignantPrivileges } from '../../hooks/useEnseignantPrivileges';
 import { errorMessage } from '../../utils/errors';
@@ -29,8 +28,10 @@ export default function SimpleRefPage({ title, resourcePath, singular }: Props) 
   const load = useCallback(async () => {
     if (!client) return;
     if (resourcePath === '/classes' && !isChef) {
-      const { data } = await client.get<MesClasseRow[]>('/classes/mes-classes');
-      const arr = Array.isArray(data) ? data : [];
+      const res = await client.get<MesClasseRow[]>('/classes/mes-classes', {
+        validateStatus: (s) => s === 200 || s === 403,
+      });
+      const arr = res.status === 200 && Array.isArray(res.data) ? res.data : [];
       setRows(
         arr
           .filter((c) => c.classeId != null)
@@ -44,6 +45,11 @@ export default function SimpleRefPage({ title, resourcePath, singular }: Props) 
     }
     if (resourcePath === '/matieres' && !isChef) {
       const { data } = await client.get<Row[]>('/matieres/mes-matieres');
+      setRows(Array.isArray(data) ? data : []);
+      return;
+    }
+    if (resourcePath === '/salles' && !isChef) {
+      const { data } = await client.get<Row[]>('/salles/mes-salles');
       setRows(Array.isArray(data) ? data : []);
       return;
     }
@@ -119,12 +125,6 @@ export default function SimpleRefPage({ title, resourcePath, singular }: Props) 
   return (
     <>
       <h1 className="page-title">{title}</h1>
-      {!canManageRefData && <PrivilegeHint variant="readOnlyRef" />}
-      <p className="page-desc">
-        {canManageRefData
-          ? 'Gestion complète (création, modification, suppression) — réservée au Chef Enseignant côté API.'
-          : 'Consultation pour tous les enseignants authentifiés.'}
-      </p>
       {err && <div className="alert alert-error">{err}</div>}
 
       {canManageRefData && (

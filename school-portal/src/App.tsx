@@ -2,7 +2,6 @@ import { useEffect, type ReactElement } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { DashboardSkeleton } from './components/ui/Skeleton';
 import { useAuth } from './context/AuthContext';
-import Landing from './pages/Landing';
 import EtudiantLayout from './layouts/EtudiantLayout';
 import EtudiantDashboard from './pages/etudiant/DashboardPage';
 import EtudiantClassePage from './pages/etudiant/ClassePage';
@@ -16,9 +15,29 @@ import MatieresPage from './pages/enseignant/MatieresPage';
 import SallesPage from './pages/enseignant/SallesPage';
 import NotesPage from './pages/enseignant/NotesPage';
 import EnseignantsPage from './pages/enseignant/EnseignantsPage';
-import EnseignantScenariosPage from './pages/enseignant/ScenariosPage';
-import EtudiantScenariosPage from './pages/etudiant/ScenariosPage';
 import keycloak from './keycloak';
+
+function HomeRedirect() {
+  const { loading, userKind, isEnseignant, isEtudiant, logout } = useAuth();
+  if (loading) {
+    return (
+      <div className="route-loading" aria-busy>
+        <DashboardSkeleton />
+      </div>
+    );
+  }
+  if (userKind === 'enseignant' || isEnseignant()) return <Navigate to="/enseignant" replace />;
+  if (userKind === 'etudiant' || isEtudiant()) return <Navigate to="/etudiant" replace />;
+  return (
+    <div className="card" style={{ maxWidth: 560, margin: '4rem auto' }}>
+      <h1 className="page-title">Accès indisponible</h1>
+      <p className="page-desc">Aucun rôle portail n’est attribué à ce compte Keycloak.</p>
+      <button type="button" className="btn btn-ghost" onClick={() => logout()}>
+        Déconnexion
+      </button>
+    </div>
+  );
+}
 
 function GuardEtudiant({ children }: { children: ReactElement }) {
   const { userKind, loading } = useAuth();
@@ -59,7 +78,7 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={<HomeRedirect />} />
 
       <Route
         path="/etudiant"
@@ -73,7 +92,6 @@ export default function App() {
         <Route path="classe" element={<EtudiantClassePage />} />
         <Route path="matieres" element={<EtudiantMatieresPage />} />
         <Route path="notes" element={<EtudiantNotesPage />} />
-        <Route path="scenarios" element={<EtudiantScenariosPage />} />
       </Route>
 
       <Route
@@ -91,7 +109,6 @@ export default function App() {
         <Route path="salles" element={<SallesPage />} />
         <Route path="notes" element={<NotesPage />} />
         <Route path="enseignants" element={<EnseignantsPage />} />
-        <Route path="scenarios" element={<EnseignantScenariosPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

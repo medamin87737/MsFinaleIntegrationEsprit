@@ -11,7 +11,7 @@ export default function NotesEtudiantPage() {
   return (
     <>
       <h1 className="page-title">Mes notes</h1>
-      <p className="page-desc">Notes et inscriptions par matière (données MSNotes).</p>
+      <p className="page-desc">Notes par matière.</p>
 
       <motion.div
         className="card"
@@ -25,6 +25,7 @@ export default function NotesEtudiantPage() {
             <thead>
               <tr>
                 <th>Matière</th>
+                <th>Prof</th>
                 <th>Note</th>
               </tr>
             </thead>
@@ -34,6 +35,9 @@ export default function NotesEtudiantPage() {
                   <tr key={row.inscriptionId ?? `${row.matiereId}-${i}`}>
                     <td>{matiereLabel(portail ?? undefined, row.matiereId)}</td>
                     <td>
+                      {portail?.matieres?.find((m) => m.id === row.matiereId)?.enseignantNom ?? '—'}
+                    </td>
+                    <td>
                       {row.note != null && typeof row.note.valeur === 'number'
                         ? String(row.note.valeur)
                         : '—'}
@@ -42,7 +46,7 @@ export default function NotesEtudiantPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={2} style={{ color: 'var(--muted)' }}>
+                  <td colSpan={3} style={{ color: 'var(--muted)' }}>
                     Aucune donnée (pas d’inscription / note, ou service indisponible au chargement).
                   </td>
                 </tr>

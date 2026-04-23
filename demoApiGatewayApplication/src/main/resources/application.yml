@@ -1,17 +1,16 @@
-# Sécurité OAuth2 / JWT (Keycloak). Les URLs peuvent être surchargées en Docker (host.docker.internal).
+# Sécurité OAuth2 / JWT (Keycloak). Surcharge possible via variables KEYCLOAK_*.
 spring:
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/school-realm}
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/school-realm/protocol/openid-connect/certs}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,prometheus
+        include: health
   endpoint:
     health:
       probes:
@@ -21,7 +20,6 @@ springdoc:
   api-docs:
     enabled: true
   swagger-ui:
-    path: /swagger-ui.html
     urls:
       - name: MSEtudiant4twin6
         url: /central-docs/MSEtudiant4twin6/v3/api-docs
@@ -33,3 +31,5 @@ springdoc:
         url: /central-docs/MSSalle4twin6/v3/api-docs
       - name: MSEnseignant4twin6
         url: /central-docs/MSEnseignant4twin6/v3/api-docs
+      - name: MSNotes4twin6
+        url: /central-docs/MSNotes4twin6/v3/api-docs

@@ -29,6 +29,9 @@ export default function EtudiantDashboard() {
                 {etudiant.nom}
               </h2>
               <p style={{ margin: 0, color: 'var(--muted)' }}>Matricule · {etudiant.matricule}</p>
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--muted)' }}>
+                Classe affectee · {etudiant.portail?.classe?.nom ?? 'Non renseignee'}
+              </p>
               {etudiant.description && (
                 <p style={{ margin: '0.75rem 0 0', maxWidth: '48ch' }}>{etudiant.description}</p>
               )}

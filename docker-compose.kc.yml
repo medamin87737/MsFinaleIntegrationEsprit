@@ -1,0 +1,237 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_twin6:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_twin6:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    command: start-dev --import-realm --hostname-strict=false --http-port=8080
+    ports:
+      - "8180:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - keycloak_twin6:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/school-realm-realm.json
+      - ./keycloak/themes/twin6-campus:/opt/keycloak/themes/twin6-campus
+
+  keycloak-realm-import:
+    image: alpine:3.19
+    depends_on:
+      - keycloak
+    environment:
+      KC_URL: http://keycloak:8080
+      KC_ADMIN: admin
+      KC_ADMIN_PASSWORD: admin
+      REALM_FILE: /realm.json
+    volumes:
+      - ./keycloak/realm-export.json:/realm.json:ro
+      - ./keycloak/bootstrap-realm.sh:/scripts/bootstrap-realm.sh:ro
+    command:
+      - sh
+      - -c
+      - sed -i 's/\r$$//' /scripts/bootstrap-realm.sh 2>/dev/null; exec sh /scripts/bootstrap-realm.sh
+
+  eureka-server:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/demo-eureka-server:1.0
+    hostname: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      EUREKA_INSTANCE_HOSTNAME: eureka-server
+
+  config-server:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/demo-config-server:1.0
+    ports:
+      - "8888:8888"
+    depends_on:
+      - eureka-server
+    environment:
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: config-server
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+
+  api-gateway:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/demo-api-gateway:1.0
+    ports:
+      - "8087:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    depends_on:
+      - eureka-server
+      - config-server
+      - keycloak
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+
+  msetudiant4twin6:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/ms-etudiant:1.0
+    restart: unless-stopped
+    ports:
+      - "8093:8093"
+    depends_on:
+      - eureka-server
+      - config-server
+      - rabbitmq
+      - keycloak
+    volumes:
+      - msetudiant_h2:/app/Database
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: msetudiant4twin6
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+      SPRING_RABBITMQ_HOST: rabbitmq
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+      KEYCLOAK_ADMIN_SERVER_URL: http://keycloak:8080
+      APP_GATEWAY_BASE_URL: http://api-gateway:8080
+
+  msclasse4twin6:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/ms-classe:1.0
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    depends_on:
+      - eureka-server
+      - config-server
+      - rabbitmq
+      - keycloak
+    volumes:
+      - msclasse_h2:/app/Database
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: msclasse4twin6
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+      SPRING_RABBITMQ_HOST: rabbitmq
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+      KEYCLOAK_ADMIN_SERVER_URL: http://keycloak:8080
+
+  msmatiere4twin6:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/ms-matiere:1.0
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - config-server
+      - mysql
+      - keycloak
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: msmatiere4twin6
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+
+  mssalle4twin6:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/ms-salle:1.0
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - config-server
+      - mysql
+      - keycloak
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: mssalle4twin6
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+
+  msenseignant4twin6:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/ms-enseignant:1.0
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - config-server
+      - mysql
+      - keycloak
+    environment:
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: msenseignant4twin6
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://eureka-server:8761/eureka"}}}}'
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+      KEYCLOAK_ADMIN_SERVER_URL: http://keycloak:8080
+
+  msnotes4twin6:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/ms-notes:1.0
+    restart: unless-stopped
+    depends_on:
+      - eureka-server
+      - config-server
+      - mongodb
+      - rabbitmq
+      - keycloak
+      - api-gateway
+    ports:
+      - "8089:8088"
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_HOST: eureka-server
+      EUREKA_PORT: "8761"
+      MONGODB_URI: mongodb://mongodb:27017/ms_notes
+      RABBITMQ_URI: amqp://guest:guest@rabbitmq:5672
+      KEYCLOAK_ISSUER: http://localhost:8180/realms/school-realm
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/school-realm/protocol/openid-connect/certs
+      GATEWAY_BASE_URL: http://api-gateway:8080
+
+  school-portal:
+    image: ${DOCKERHUB_USERNAME:-workapp21}/school-portal:1.0
+    ports:
+      - "5173:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
+volumes:
+  mysql_twin6: {}
+  mongo_twin6: {}
+  keycloak_twin6: {}
+  msetudiant_h2: {}
+  msclasse_h2: {}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Twin6 — Liens localhost</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; background: #0f1419; color: #e6edf3; }
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    h1 { font-size: 1.35rem; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.05rem; margin-top: 1.75rem; color: #58a6ff; }
+    p.note { background: #21262d; border-left: 4px solid #d29922; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 0.5rem 0; }
+    a { color: #79c0ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: #21262d; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.88em; }
+    .grid { display: grid; gap: 0.35rem 1rem; }
+    @media (min-width: 520px) { .grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Twin6 Campus — liens localhost</h1>
+  <p class="note">
+    Démarrez les services selon <strong>LOCAL-RUN.md</strong> (Keycloak, Mongo, Rabbit, Eureka, Config, Gateway, MS, MSNotes), puis <code>npm run dev</code> dans <code>school-portal</code>.
+  </p>
+
+  <h2>Application</h2>
+  <ul class="grid">
+    <li><a href="http://localhost:5173/" target="_blank" rel="noopener">Portail React (Vite) — <code>:5173</code></a></li>
+    <li><a href="http://localhost:8080/" target="_blank" rel="noopener">API Gateway — <code>:8080</code></a></li>
+    <li><a href="http://localhost:8080/swagger-ui.html" target="_blank" rel="noopener">Swagger agrégé — <code>/swagger-ui.html</code></a></li>
+    <li><a href="http://localhost:8180/" target="_blank" rel="noopener">Keycloak — <code>:8180</code></a></li>
+    <li><a href="http://localhost:8180/realms/school-realm/account" target="_blank" rel="noopener">Compte realm <code>school-realm</code></a></li>
+  </ul>
+
+  <h2>Infra technique</h2>
+  <ul class="grid">
+    <li><a href="http://localhost:8761/" target="_blank" rel="noopener">Eureka — <code>:8761</code></a></li>
+    <li><a href="http://localhost:8888/" target="_blank" rel="noopener">Config Server — <code>:8888</code></a></li>
+    <li><a href="http://localhost:8888/actuator/health" target="_blank" rel="noopener">Config health</a></li>
+    <li><a href="http://localhost:8080/actuator/health" target="_blank" rel="noopener">Gateway health</a></li>
+    <li><a href="http://localhost:8089/" target="_blank" rel="noopener">MSNotes — <code>:8089</code> (Docker)</a></li>
+    <li><a href="http://localhost:15672/" target="_blank" rel="noopener">RabbitMQ Management — <code>:15672</code></a> (guest / guest)</li>
+    <li><a href="http://localhost:8081/" target="_blank" rel="noopener">phpMyAdmin (MySQL) — <code>:8081</code></a> (serveur <code>mysql</code>, root / root)</li>
+  </ul>
+
+  <h2>MongoDB</h2>
+  <p>URI typique : <code>mongodb://127.0.0.1:27017/ms_notes</code> (adapter le port si besoin).</p>
+
+  <p style="margin-top:2rem;font-size:0.85rem;color:#8b949e;">scripts/localhost-links.html</p>
+</body>
+</html>

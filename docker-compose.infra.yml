@@ -1,67 +1,59 @@
-# Infra seule : Keycloak + MongoDB + RabbitMQ (sans Eureka / Gateway / MS).
-# Utile pour développer les microservices depuis l’IDE.
+# Infra locale : MongoDB, RabbitMQ, Keycloak (realm school-realm importé au démarrage).
+# Depuis le dossier MS : docker compose -f docker-compose.infra.yml up -d
+# Keycloak : http://localhost:8180  (admin / admin au premier lancement si demandé)
+# Comptes démo : voir LOCAL-RUN.md
 #
-#   docker compose -f docker-compose.infra.yml up -d
-#
-# Stack complète (tous les conteneurs) : depuis MS/, simplement
-#   docker compose up -d --build
-# (voir docker-compose.yml qui inclut docker-compose.full-stack.yml)
+# RabbitMQ UI : http://localhost:15672 (guest / guest). Les files apparaissent quand MSClasse et MSEtudiant
+# sont démarrés (app.rabbitmq.enabled=true par défaut dans le Config Server / application.properties).
 
 services:
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0.5
-    command:
-      - start-dev
-      - --http-port=8180
-      - --hostname-strict=false
-      - --import-realm
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_HEALTH_ENABLED: "true"
-    ports:
-      - "8180:8180"
-    volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
-      - ./keycloak/themes:/opt/keycloak/themes:ro
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "exec 3<>/dev/tcp/127.0.0.1/8180 && echo -e 'GET /realms/school-realm HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && timeout 3 cat <&3 | grep -q 'HTTP/1.1 200'",
-        ]
-      interval: 15s
-      timeout: 10s
-      retries: 30
-      start_period: 90s
-
-  mongodb:
+  mongo:
     image: mongo:7
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      - mongo_twin6:/data/db
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3.13-management-alpine
     ports:
       - "5672:5672"
       - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    command: start-dev --import-realm --hostname-strict=false --http-port=8080
+    ports:
+      - "8180:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - keycloak_twin6:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/school-realm-realm.json
+      - ./keycloak/themes/twin6-campus:/opt/keycloak/themes/twin6-campus
+
+  # Import idempotent via API Admin (corrige le cas où --import-realm n'a pas créé le realm, ex. volume déjà initialisé).
+  keycloak-realm-import:
+    image: alpine:3.19
+    depends_on:
+      - keycloak
+    environment:
+      KC_URL: http://keycloak:8080
+      KC_ADMIN: admin
+      KC_ADMIN_PASSWORD: admin
+      REALM_FILE: /realm.json
+    volumes:
+      - ./keycloak/realm-export.json:/realm.json:ro
+      - ./keycloak/bootstrap-realm.sh:/scripts/bootstrap-realm.sh:ro
+    command:
+      - sh
+      - -c
+      - sed -i 's/\r$$//' /scripts/bootstrap-realm.sh 2>/dev/null; exec sh /scripts/bootstrap-realm.sh
 
 volumes:
-  mongo_data: {}
+  mongo_twin6: {}
+  keycloak_twin6: {}

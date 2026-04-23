@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -15,7 +16,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Autorités Spring = rôles realm Keycloak (utiliser {@code hasAuthority("ROLE_…")}).
+ * Autorités Spring = rôles Keycloak (realm + resource_access clients),
+ * pour rester aligné avec la gateway et les autres microservices.
  */
 @Component
 public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
@@ -32,11 +34,40 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
 
     @SuppressWarnings("unchecked")
     private Collection<GrantedAuthority> extractRealmRoles(Jwt jwt) {
+        List<String> roles = new ArrayList<>();
         Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
-        if (realmAccess == null) {
+        if (realmAccess != null) {
+            roles.addAll((List<String>) realmAccess.getOrDefault("roles", List.of()));
+        }
+
+        Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
+        if (resourceAccess != null) {
+            for (Object clientVal : resourceAccess.values()) {
+                if (!(clientVal instanceof Map<?, ?> clientMap)) {
+                    continue;
+                }
+                Object clientRoles = clientMap.get("roles");
+                if (clientRoles instanceof List<?> list) {
+                    for (Object role : list) {
+                        if (role instanceof String s) {
+                            roles.add(s);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (roles.isEmpty()) {
             return Collections.emptyList();
         }
-        List<String> roles = (List<String>) realmAccess.getOrDefault("roles", List.of());
-        return roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList());
+
+        List<String> uniqueRoles = roles.stream().distinct().toList();
+        List<GrantedAuthority> authorities = uniqueRoles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toCollection(ArrayList::new));
+        if (uniqueRoles.contains("ROLE_ADMIN") && !uniqueRoles.contains("ROLE_CHEF_ENSEIGNANT")) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_CHEF_ENSEIGNANT"));
+        }
+        return authorities;
     }
 }

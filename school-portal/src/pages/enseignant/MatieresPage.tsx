@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import PrivilegeHint from '../../components/PrivilegeHint';
 import { MatieresAffectationCard } from '../../components/MatiereSalleCards';
 import { useEnseignantApi } from '../../hooks/useEnseignantApi';
 import { useEnseignantPrivileges } from '../../hooks/useEnseignantPrivileges';
@@ -9,6 +8,7 @@ type MatiereRow = {
   id: number;
   nom: string;
   description?: string | null;
+  enseignantId?: number | null;
   salleId?: number | null;
   classeId?: number | null;
   heureDebutSeance?: string | null;
@@ -17,6 +17,7 @@ type MatiereRow = {
 
 type ClasseRow = { id: number; nom: string };
 type SalleRow = { id: number; nom: string };
+type EnseignantRow = { id: number; nom: string; matricule?: string | null };
 
 function displayCreneau(debut?: string | null, fin?: string | null) {
   if (!debut || !fin) return '—';
@@ -32,6 +33,7 @@ export default function MatieresPage() {
   const [rows, setRows] = useState<MatiereRow[]>([]);
   const [classes, setClasses] = useState<ClasseRow[]>([]);
   const [salles, setSalles] = useState<SalleRow[]>([]);
+  const [enseignants, setEnseignants] = useState<EnseignantRow[]>([]);
 
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,10 +43,12 @@ export default function MatieresPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const [affectMatiereId, setAffectMatiereId] = useState('');
+  const [affectEnseignantId, setAffectEnseignantId] = useState('');
   const [affectClasseId, setAffectClasseId] = useState('');
   const [affectSalleId, setAffectSalleId] = useState('');
   const [heureDebut, setHeureDebut] = useState('08:00');
   const [heureFin, setHeureFin] = useState('10:00');
+
 
   const classesMap = useMemo(
     () =>
@@ -64,32 +68,46 @@ export default function MatieresPage() {
     [salles],
   );
 
+  const enseignantsMap = useMemo(
+    () =>
+      enseignants.reduce<Record<number, string>>((acc, e) => {
+        acc[e.id] = e.matricule ? `${e.nom} (${e.matricule})` : e.nom;
+        return acc;
+      }, {}),
+    [enseignants],
+  );
+
   const loadAll = useCallback(async () => {
     if (!client) return;
     if (isChef) {
-      const [mRes, cRes, sRes] = await Promise.all([
+      const [mRes, cRes, sRes, eRes] = await Promise.all([
         client.get<MatiereRow[]>('/matieres'),
         client.get<ClasseRow[]>('/classes'),
         client.get<SalleRow[]>('/salles'),
+        client.get<EnseignantRow[]>('/enseignants'),
       ]);
-      setRows(Array.isArray(mRes.data) ? mRes.data : []);
+      const matieresData = Array.isArray(mRes.data) ? mRes.data : [];
+      const enseignantsData = Array.isArray(eRes.data) ? eRes.data : [];
+      setRows(matieresData);
       setClasses(Array.isArray(cRes.data) ? cRes.data : []);
       setSalles(Array.isArray(sRes.data) ? sRes.data : []);
+      setEnseignants(enseignantsData);
       return;
     }
     const [mRes, mesRes, sRes] = await Promise.all([
       client.get<MatiereRow[]>('/matieres/mes-matieres'),
-      client.get<MesClasseRow[]>('/classes/mes-classes'),
-      client.get<SalleRow[]>('/salles'),
+      client.get<MesClasseRow[]>('/classes/mes-classes', { validateStatus: (s) => s === 200 || s === 403 }),
+      client.get<SalleRow[]>('/salles/mes-salles'),
     ]);
     setRows(Array.isArray(mRes.data) ? mRes.data : []);
-    const mes = Array.isArray(mesRes.data) ? mesRes.data : [];
+    const mes = mesRes.status === 200 && Array.isArray(mesRes.data) ? mesRes.data : [];
     setClasses(
       mes
         .filter((c) => c.classeId != null)
         .map((c) => ({ id: Number(c.classeId), nom: c.classeNom ?? '' })),
     );
     setSalles(Array.isArray(sRes.data) ? sRes.data : []);
+    setEnseignants([]);
   }, [client, isChef]);
 
   useEffect(() => {
@@ -161,14 +179,22 @@ export default function MatieresPage() {
     e.preventDefault();
     if (!client || !canManageRefData) return;
     const matiereId = Number(affectMatiereId);
+    const enseignantId = Number(affectEnseignantId);
     const classeId = Number(affectClasseId);
     const salleId = Number(affectSalleId);
     if (!Number.isInteger(matiereId) || matiereId < 1) {
       setErr("Sélectionnez d'abord une matière valide.");
       return;
     }
-    if (!Number.isInteger(classeId) || classeId < 1 || !Number.isInteger(salleId) || salleId < 1) {
-      setErr('Classe et salle sont obligatoires pour l’affectation.');
+    if (
+      !Number.isInteger(enseignantId) ||
+      enseignantId < 1 ||
+      !Number.isInteger(classeId) ||
+      classeId < 1 ||
+      !Number.isInteger(salleId) ||
+      salleId < 1
+    ) {
+      setErr('Enseignant, classe et salle sont obligatoires pour l’affectation.');
       return;
     }
     if (!heureDebut || !heureFin) {
@@ -180,6 +206,7 @@ export default function MatieresPage() {
     setErr(null);
     try {
       await client.put(`/matieres/${matiereId}/assignation-salle`, {
+        enseignantId,
         classeId,
         salleId,
         heureDebutSeance: heureDebut,
@@ -196,12 +223,6 @@ export default function MatieresPage() {
   return (
     <>
       <h1 className="page-title">Matières</h1>
-      {!canManageRefData && <PrivilegeHint variant="readOnlyRef" />}
-      <p className="page-desc">
-        {canManageRefData
-          ? 'Gestion complète (création, modification, suppression) + affectation classe/salle/créneau.'
-          : 'Consultation de toutes les matières et de leurs affectations.'}
-      </p>
 
       {err && <div className="alert alert-error">{err}</div>}
 
@@ -236,7 +257,7 @@ export default function MatieresPage() {
       {canManageRefData && (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginTop: 0 }}>
-            Affecter matière vers classe / salle / créneau
+            Affecter matière vers enseignant / classe / salle / créneau
           </h3>
           <form onSubmit={onAssignationSubmit} style={{ display: 'grid', gap: '0.75rem', maxWidth: 640 }}>
             <div className="field" style={{ marginBottom: 0 }}>
@@ -251,6 +272,22 @@ export default function MatieresPage() {
                 {rows.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.nom}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="aff-enseignant">Enseignant</label>
+              <select
+                id="aff-enseignant"
+                value={affectEnseignantId}
+                onChange={(e) => setAffectEnseignantId(e.target.value)}
+                required
+              >
+                <option value="">Sélectionner...</option>
+                {enseignants.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.matricule ? `${e.nom} (${e.matricule})` : e.nom}
                   </option>
                 ))}
               </select>
@@ -322,6 +359,7 @@ export default function MatieresPage() {
               <tr>
                 <th>Nom</th>
                 <th>Description</th>
+                <th>Enseignant</th>
                 <th>Classe</th>
                 <th>Salle</th>
                 <th>Heure début</th>
@@ -335,6 +373,7 @@ export default function MatieresPage() {
                 <tr key={r.id}>
                   <td>{r.nom}</td>
                   <td>{r.description ?? '—'}</td>
+                  <td>{r.enseignantId != null ? (enseignantsMap[r.enseignantId] ?? `#${r.enseignantId}`) : '—'}</td>
                   <td>{r.classeId != null ? (classesMap[r.classeId] ?? '—') : '—'}</td>
                   <td>{r.salleId != null ? (sallesMap[r.salleId] ?? '—') : '—'}</td>
                   <td>{r.heureDebutSeance ?? '—'}</td>
@@ -356,7 +395,7 @@ export default function MatieresPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={canManageRefData ? 8 : 7} style={{ color: 'var(--muted)' }}>
+                  <td colSpan={canManageRefData ? 9 : 8} style={{ color: 'var(--muted)' }}>
                     Aucune matière disponible.
                   </td>
                 </tr>

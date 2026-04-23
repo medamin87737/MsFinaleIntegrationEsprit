@@ -12,8 +12,13 @@ export function normalizeEnseignantRole(role: string | undefined | null): Enseig
   if (compact === 'CHEFENSEIGNANT' || compact === 'CHEF_ENSEIGNANT') {
     return 'Chef Enseignant';
   }
+  if (compact === 'ADMINISTRATEUR' || compact === 'ADMIN') {
+    return 'Administrateur';
+  }
   const lower = r.toLowerCase();
   if (lower === 'chef enseignant') return 'Chef Enseignant';
   if (r === 'Chef Enseignant') return 'Chef Enseignant';
+  if (lower === 'administrateur' || lower === 'admin') return 'Administrateur';
+  if (r === 'Administrateur') return 'Administrateur';
   return 'Enseignant';
 }

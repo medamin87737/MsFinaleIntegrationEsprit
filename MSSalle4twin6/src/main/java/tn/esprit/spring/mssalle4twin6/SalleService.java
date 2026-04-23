@@ -9,8 +9,16 @@ import tn.esprit.spring.mssalle4twin6.feign.ClasseInfo;
 import tn.esprit.spring.mssalle4twin6.feign.MatiereFeignClient;
 import tn.esprit.spring.mssalle4twin6.feign.MatiereSessionInfo;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Service
 public class SalleService implements ISalleService {
@@ -27,6 +35,46 @@ public class SalleService implements ISalleService {
         this.repository = repository;
         this.classeFeignClient = classeFeignClient;
         this.matiereFeignClient = matiereFeignClient;
+    }
+
+    private static boolean hasAuthority(String name) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        for (GrantedAuthority a : auth.getAuthorities()) {
+            if (name.equals(a.getAuthority())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public List<Salle> findMesSallesPourUtilisateurConnecte() {
+        if (hasAuthority("ROLE_CHEF_ENSEIGNANT")) {
+            return repository.findAll();
+        }
+        List<MatiereSessionInfo> matieres;
+        try {
+            matieres = matiereFeignClient.getMesMatieres();
+        } catch (FeignException e) {
+            if (e.status() == 403 || e.status() == 401) {
+                return List.of();
+            }
+            throw e;
+        }
+        if (matieres == null || matieres.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> ids = matieres.stream()
+                .map(MatiereSessionInfo::getSalleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return repository.findAllById(ids);
     }
 
     @Override

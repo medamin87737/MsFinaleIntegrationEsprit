@@ -9,6 +9,7 @@ import tn.esprit.spring.msenseignant4twin6.dto.EnseignantResponseDto;
 import tn.esprit.spring.msenseignant4twin6.security.SecurityUtils;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RefreshScope
@@ -45,15 +46,21 @@ public class EnseignantController {
                     .toList();
             return ResponseEntity.ok(profs);
         }
+        /*
+         * Le login Keycloak = matricule en base : c’est la source de vérité pour « qui est connecté ».
+         * Le claim school_enseignant_id est souvent faux ou partagé après imports / provisionnement ;
+         * s’il est utilisé en premier, tous les comptes peuvent retomber sur la même fiche (ex. dernier créé).
+         */
+        String mat = securityUtils.getPreferredUsername();
         Long id = securityUtils.getSchoolEnseignantId();
+        if (mat != null && !mat.isBlank()) {
+            Optional<Enseignant> byMat = service.findByMatriculeIgnoreCase(mat.trim());
+            if (byMat.isPresent()) {
+                return ResponseEntity.ok(List.of(EnseignantResponseDto.fromEntity(byMat.get())));
+            }
+        }
         if (id != null) {
             return service.getById(id)
-                    .map(e -> ResponseEntity.ok(List.of(EnseignantResponseDto.fromEntity(e))))
-                    .orElseGet(() -> ResponseEntity.notFound().build());
-        }
-        String mat = securityUtils.getPreferredUsername();
-        if (mat != null && !mat.isBlank()) {
-            return service.findByMatriculeIgnoreCase(mat)
                     .map(e -> ResponseEntity.ok(List.of(EnseignantResponseDto.fromEntity(e))))
                     .orElseGet(() -> ResponseEntity.notFound().build());
         }

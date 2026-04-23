@@ -7,6 +7,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ISalleService {
+    /**
+     * Salles liées aux matières de l'enseignant connecté. Chef : toutes les salles (même comportement que {@link #getAll()}).
+     */
+    List<Salle> findMesSallesPourUtilisateurConnecte();
+
     List<Salle> getAll();
     Optional<Salle> getById(Long id);
     Salle create(Salle entity);

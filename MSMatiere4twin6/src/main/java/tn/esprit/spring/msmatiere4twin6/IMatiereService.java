@@ -40,6 +40,6 @@ public interface IMatiereService {
     /** Matières d'une salle filtrées pour enseignant / étudiant. */
     List<Matiere> getBySalleIdSecured(Long salleId);
 
-    /** Affecter une salle et un créneau horaire à une matière. */
-    Optional<Matiere> assignerSalle(Long matiereId, Long salleId, Long classeId, LocalTime heureDebutSeance, LocalTime heureFinSeance);
+    /** Affecter enseignant + classe + salle + créneau horaire à une matière. */
+    Optional<Matiere> assignerSalle(Long matiereId, Long enseignantId, Long salleId, Long classeId, LocalTime heureDebutSeance, LocalTime heureFinSeance);
 }

@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="MSEnseignant4twin6Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="MSEnseignant4twin6" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="tn.esprit.spring.msenseignant4twin6.MSEnseignant4twin6Application" />
+    <option name="SHORTEN_COMMAND_LINE" value="ARGS_FILE" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import PrivilegeHint from '../../components/PrivilegeHint';
 import { useEnseignantApi } from '../../hooks/useEnseignantApi';
 import { useEnseignantPrivileges } from '../../hooks/useEnseignantPrivileges';
 import { errorMessage } from '../../utils/errors';
@@ -42,8 +41,10 @@ export default function EtudiantsPage() {
       );
       return;
     }
-    const { data: mes } = await client.get<Array<{ classeId?: number; classeNom?: string }>>('/classes/mes-classes');
-    const classes = Array.isArray(mes) ? mes : [];
+    const mesRes = await client.get<Array<{ classeId?: number; classeNom?: string }>>('/classes/mes-classes', {
+      validateStatus: (s) => s === 200 || s === 403,
+    });
+    const classes = mesRes.status === 200 && Array.isArray(mesRes.data) ? mesRes.data : [];
     const classeById = new Map<number, string>();
     for (const c of classes) {
       if (c.classeId != null && Number(c.classeId) > 0) {
@@ -176,12 +177,6 @@ export default function EtudiantsPage() {
   return (
     <>
       <h1 className="page-title">Étudiants</h1>
-      {!canManageRefData && <PrivilegeHint variant="readOnlyRef" />}
-      <p className="page-desc">
-        {canManageRefData
-          ? 'Gestion des fiches étudiants (création, modification, suppression) — Chef Enseignant uniquement.'
-          : 'Liste en lecture pour les enseignants ; les écritures sont réservées au Chef Enseignant.'}
-      </p>
       {err && <div className="alert alert-error">{err}</div>}
 
       {canManageRefData && (

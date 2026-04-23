@@ -81,12 +81,9 @@ jobs:
           cache: maven
           cache-dependency-path: demoConfigServer/pom.xml
 
-      - name: Install Maven
-        run: sudo apt-get update && sudo apt-get install -y maven
-
       - name: Package Config Server
         working-directory: demoConfigServer
-        run: mvn -B -q -DskipTests package
+        run: chmod +x mvnw && ./mvnw -B -q -DskipTests package
 
   nest-msnotes:
     name: NestJS — MSNotes

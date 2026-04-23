@@ -51,12 +51,6 @@ export function MatieresAffectationCard({
 
   const load = useCallback(async () => {
     if (!client) return;
-    const sallesRes = await client.get<SalleRow[]>('/salles');
-    const salles = Array.isArray(sallesRes.data) ? sallesRes.data : [];
-    const nextMap = salles.reduce<Record<number, string>>((acc, s) => {
-      acc[s.id] = s.nom;
-      return acc;
-    }, {});
 
     if (userKind === 'etudiant') {
       let matieres: MatiereRow[] = [];
@@ -71,22 +65,24 @@ export function MatieresAffectationCard({
         matieres = [];
       }
       const nextClassesMap: Record<number, string> = {};
-      try {
-        const cRes = await client.get<{ id?: number; nom?: string }>('/classes/me', {
-          validateStatus: (s) => s === 200 || s === 404,
-        });
-        if (cRes.status === 200) {
-          const c = cRes.data;
-          if (c?.id != null) nextClassesMap[c.id] = c.nom ?? '';
+      for (const m of matieres) {
+        if (m.classeId != null && nextClassesMap[m.classeId] == null) {
+          nextClassesMap[m.classeId] = `Classe ${m.classeId}`;
         }
-      } catch {
-        /* pas de classe assignée */
       }
       setRows(matieres);
-      setSallesMap(nextMap);
+      setSallesMap({});
       setClassesMap(nextClassesMap);
       return;
     }
+
+    const sallesPath = isChef ? '/salles' : '/salles/mes-salles';
+    const sallesRes = await client.get<SalleRow[]>(sallesPath);
+    const salles = Array.isArray(sallesRes.data) ? sallesRes.data : [];
+    const nextMap = salles.reduce<Record<number, string>>((acc, s) => {
+      acc[s.id] = s.nom;
+      return acc;
+    }, {});
 
     if (userKind !== 'enseignant') {
       setRows([]);
@@ -114,10 +110,10 @@ export function MatieresAffectationCard({
 
     const [matieresRes, mesRes] = await Promise.all([
       client.get<MatiereRow[]>('/matieres/mes-matieres'),
-      client.get<MesClasseAgg[]>('/classes/mes-classes'),
+      client.get<MesClasseAgg[]>('/classes/mes-classes', { validateStatus: (s) => s === 200 || s === 403 }),
     ]);
     const matieres = Array.isArray(matieresRes.data) ? matieresRes.data : [];
-    const mes = Array.isArray(mesRes.data) ? mesRes.data : [];
+    const mes = mesRes.status === 200 && Array.isArray(mesRes.data) ? mesRes.data : [];
     const nextClassesMap = mes.reduce<Record<number, string>>((acc, c) => {
       const id = c.classeId;
       if (id != null) acc[id] = c.classeNom ?? '';
@@ -203,12 +199,14 @@ export function SallesAvecMatieresCard({
   client: AxiosInstance | null;
   title?: string;
 }) {
+  const { isChef } = useEnseignantPrivileges();
   const [rows, setRows] = useState<SalleAvecMatieres[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!client) return;
-    const { data: sallesData } = await client.get<SalleRow[]>('/salles');
+    const sallesPath = isChef ? '/salles' : '/salles/mes-salles';
+    const { data: sallesData } = await client.get<SalleRow[]>(sallesPath);
     const salles = Array.isArray(sallesData) ? sallesData : [];
 
     const details = await Promise.all(
@@ -219,7 +217,7 @@ export function SallesAvecMatieresCard({
     );
 
     setRows(details);
-  }, [client]);
+  }, [client, isChef]);
 
   useEffect(() => {
     if (!client) return;
@@ -289,6 +287,8 @@ export function ClassesAvecMatieresCard({
   title?: string;
   classId?: number;
 }) {
+  const { userKind } = useAuth();
+  const { isChef } = useEnseignantPrivileges();
   const [rows, setRows] = useState<ClasseAvecMatieres[]>([]);
   const [sallesMap, setSallesMap] = useState<Record<number, string>>({});
   const [err, setErr] = useState<string | null>(null);
@@ -296,8 +296,54 @@ export function ClassesAvecMatieresCard({
   const load = useCallback(async () => {
     if (!client) return;
 
-    const sallesRes = await client.get<SalleRow[]>('/salles');
-    const salles = Array.isArray(sallesRes.data) ? sallesRes.data : [];
+    if (classId != null) {
+      const { data } = await client.get<ClasseAvecMatieres>(`/classes/${classId}/matieres-dediees`);
+      const row = data ?? null;
+      setRows(row ? [row] : []);
+
+      if (row && userKind === 'etudiant') {
+        const uniqueSalleIds = Array.from(
+          new Set((row.matieres ?? []).map((m) => m.salleId).filter((id): id is number => id != null)),
+        );
+        const salleEntries = await Promise.all(
+          uniqueSalleIds.map(async (id) => {
+            try {
+              const res = await client.get<SalleRow>(`/salles/${id}`, {
+                validateStatus: (s) => s === 200 || s === 404 || s === 403,
+              });
+              if (res.status === 200 && res.data?.nom) return [id, res.data.nom] as const;
+            } catch {
+              /* ignore */
+            }
+            return [id, '—'] as const;
+          }),
+        );
+        setSallesMap(
+          salleEntries.reduce<Record<number, string>>((acc, [id, nom]) => {
+            acc[id] = nom;
+            return acc;
+          }, {}),
+        );
+        return;
+      }
+
+      const sallesPath = isChef ? '/salles' : '/salles/mes-salles';
+      const sallesRes = await client.get<SalleRow[]>(sallesPath, {
+        validateStatus: (s) => s === 200 || s === 403,
+      });
+      const salles = sallesRes.status === 200 && Array.isArray(sallesRes.data) ? sallesRes.data : [];
+      setSallesMap(
+        salles.reduce<Record<number, string>>((acc, s) => {
+          acc[s.id] = s.nom;
+          return acc;
+        }, {}),
+      );
+      return;
+    }
+
+    const sallesPath = isChef ? '/salles' : '/salles/mes-salles';
+    const sallesRes = await client.get<SalleRow[]>(sallesPath, { validateStatus: (s) => s === 200 || s === 403 });
+    const salles = sallesRes.status === 200 && Array.isArray(sallesRes.data) ? sallesRes.data : [];
     setSallesMap(
       salles.reduce<Record<number, string>>((acc, s) => {
         acc[s.id] = s.nom;
@@ -305,15 +351,11 @@ export function ClassesAvecMatieresCard({
       }, {}),
     );
 
-    if (classId != null) {
-      const { data } = await client.get<ClasseAvecMatieres>(`/classes/${classId}/matieres-dediees`);
-      setRows(data ? [data] : []);
-      return;
-    }
-
-    const { data } = await client.get<ClasseAvecMatieres[]>('/classes/mes-classes');
-    setRows(Array.isArray(data) ? data : []);
-  }, [client, classId]);
+    const res = await client.get<ClasseAvecMatieres[]>('/classes/mes-classes', {
+      validateStatus: (s) => s === 200 || s === 403,
+    });
+    setRows(res.status === 200 && Array.isArray(res.data) ? res.data : []);
+  }, [client, classId, isChef, userKind]);
 
   useEffect(() => {
     if (!client) return;
@@ -358,7 +400,7 @@ export function ClassesAvecMatieresCard({
                   {(c.matieres ?? []).map((m) => (
                     <li key={m.id} style={{ marginBottom: '0.45rem' }}>
                       <strong>{m.nom}</strong> —{' '}
-                      {m.salleId != null ? (sallesMap[m.salleId] ?? 'Salle') : '—'} —{' '}
+                      {m.salleId != null ? (sallesMap[m.salleId] ?? '—') : '—'} —{' '}
                       {formatCreneau(m.heureDebutSeance, m.heureFinSeance)}
                     </li>
                   ))}

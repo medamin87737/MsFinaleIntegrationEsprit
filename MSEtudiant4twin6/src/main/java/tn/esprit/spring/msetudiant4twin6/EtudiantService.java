@@ -1,14 +1,17 @@
 package tn.esprit.spring.msetudiant4twin6;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import tn.esprit.spring.msetudiant4twin6.keycloak.KeycloakEtudiantProvisioningService;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,13 +21,18 @@ public class EtudiantService implements IEtudiantService {
 
     private final EtudiantRepository repository;
     private final RestTemplate restTemplate;
+    private final ObjectProvider<KeycloakEtudiantProvisioningService> keycloakProvisioning;
 
-    @Value("${app.gateway.base-url:http://localhost:8080}")
+    @Value("${app.gateway.base-url:http://api-gateway:8080}")
     private String gatewayBase;
 
-    public EtudiantService(EtudiantRepository repository, RestTemplate restTemplate) {
+    public EtudiantService(
+            EtudiantRepository repository,
+            RestTemplate restTemplate,
+            ObjectProvider<KeycloakEtudiantProvisioningService> keycloakProvisioning) {
         this.repository = repository;
         this.restTemplate = restTemplate;
+        this.keycloakProvisioning = keycloakProvisioning;
     }
 
     @Override
@@ -38,31 +46,71 @@ public class EtudiantService implements IEtudiantService {
     }
 
     @Override
+    @Transactional
     public Etudiant create(Etudiant entity) {
         entity.setId(null);
-        return repository.save(entity);
+        Etudiant saved = repository.save(entity);
+        keycloakProvisioning.ifAvailable(
+                kc -> {
+                    Optional<String> kid =
+                            kc.syncEtudiant(saved.getMatricule(), saved.getPassword(), saved.getId(), true);
+                    kid.ifPresent(
+                            id -> {
+                                saved.setKeycloakId(id);
+                                repository.save(saved);
+                            });
+                });
+        return saved;
     }
 
     @Override
+    @Transactional
     public Optional<Etudiant> update(Long id, Etudiant entity) {
-        return repository.findById(id).map(existing -> {
-            existing.setNom(entity.getNom());
-            existing.setDescription(entity.getDescription());
-            existing.setMatricule(entity.getMatricule());
-            existing.setClasseId(entity.getClasseId());
-            if (entity.getKeycloakId() != null) {
-                existing.setKeycloakId(entity.getKeycloakId());
-            }
-            if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
-                existing.setPassword(entity.getPassword());
-            }
-            return repository.save(existing);
-        });
+        return repository
+                .findById(id)
+                .map(
+                        existing -> {
+                            String oldMatricule = existing.getMatricule();
+                            existing.setNom(entity.getNom());
+                            existing.setDescription(entity.getDescription());
+                            existing.setMatricule(entity.getMatricule());
+                            existing.setClasseId(entity.getClasseId());
+                            if (entity.getKeycloakId() != null) {
+                                existing.setKeycloakId(entity.getKeycloakId());
+                            }
+                            if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
+                                existing.setPassword(entity.getPassword());
+                            }
+                            Etudiant saved = repository.save(existing);
+                            keycloakProvisioning.ifAvailable(
+                                    kc -> {
+                                        if (oldMatricule != null
+                                                && saved.getMatricule() != null
+                                                && !oldMatricule.equalsIgnoreCase(saved.getMatricule().trim())) {
+                                            kc.deleteByMatricule(oldMatricule);
+                                        }
+                                        kc.syncEtudiant(
+                                                        saved.getMatricule(),
+                                                        entity.getPassword(),
+                                                        saved.getId(),
+                                                        false)
+                                                .ifPresent(saved::setKeycloakId);
+                                        repository.save(saved);
+                                    });
+                            return saved;
+                        });
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
-        repository.deleteById(id);
+        repository
+                .findById(id)
+                .ifPresent(
+                        e -> {
+                            keycloakProvisioning.ifAvailable(kc -> kc.deleteByMatricule(e.getMatricule()));
+                            repository.deleteById(id);
+                        });
     }
 
     @Override

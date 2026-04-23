@@ -6,6 +6,7 @@ import java.time.LocalTime;
 
 public class AssignationSalleRequest {
 
+    private Long enseignantId;
     private Long salleId;
     private Long classeId;
 
@@ -14,6 +15,14 @@ public class AssignationSalleRequest {
 
     @JsonFormat(pattern = "HH:mm")
     private LocalTime heureFinSeance;
+
+    public Long getEnseignantId() {
+        return enseignantId;
+    }
+
+    public void setEnseignantId(Long enseignantId) {
+        this.enseignantId = enseignantId;
+    }
 
     public Long getSalleId() {
         return salleId;

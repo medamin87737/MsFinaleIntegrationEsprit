@@ -15,6 +15,7 @@ import { UpdateNoteDto } from './dto/update-note.dto';
 import { Inscription, InscriptionDocument } from './schemas/inscription.schema';
 import { Note, NoteDocument } from './schemas/note.schema';
 import { NoteHistorique } from './schemas/note-historique.schema';
+import { GatewayForwardHeaders, GatewayPedagogieClient } from '../pedagogie/gateway-pedagogie.client';
 import { RabbitMqPublisherService } from '../rabbitmq/rabbitmq-publisher.service';
 import { allKeycloakRoles } from '../auth/jwt-roles';
 
@@ -41,6 +42,7 @@ export class NotesService {
     @InjectModel(NoteHistorique.name)
     private readonly historiqueModel: Model<NoteHistorique>,
     private readonly rabbit: RabbitMqPublisherService,
+    private readonly gateway: GatewayPedagogieClient,
   ) {}
 
   private static realmRoles(user: Record<string, unknown> | undefined): string[] {
@@ -56,12 +58,180 @@ export class NotesService {
   }
 
   private static etudiantIdFromUser(user: Record<string, unknown> | undefined): number {
-    const raw = user?.school_etudiant_id;
+    const raw = user?.school_etudiant_id ?? user?.schoolEtudiantId;
     const id = raw != null && raw !== '' ? Number(raw) : NaN;
     if (!Number.isInteger(id) || id < 1) {
       throw new BadRequestException('Claim school_etudiant_id manquant ou invalide dans le token.');
     }
     return id;
+  }
+
+  /** Résout l’id métier étudiant : claim JWT, sinon GET /etudiants/me via la gateway (même Authorization). */
+  private async resolveEtudiantIdForStudent(
+    user: Record<string, unknown>,
+    fwd: GatewayForwardHeaders | null,
+  ): Promise<number> {
+    try {
+      return NotesService.etudiantIdFromUser(user);
+    } catch {
+      /* claim absent ou invalide */
+    }
+    if (!fwd?.authorization?.trim()) {
+      throw new BadRequestException(
+        'Claim school_etudiant_id manquant : impossible de charger vos notes sans en-tête Authorization.',
+      );
+    }
+    let me: Record<string, unknown>;
+    try {
+      me = await this.gateway.getEtudiantMeJson(fwd);
+    } catch {
+      throw new BadRequestException(
+        'Profil étudiant introuvable pour ce compte (gateway). Vérifiez que la fiche est liée à Keycloak (sub ou matricule).',
+      );
+    }
+    const mid = Number(me.id);
+    if (!Number.isInteger(mid) || mid < 1) {
+      throw new BadRequestException('Réponse /etudiants/me invalide (id).');
+    }
+    return mid;
+  }
+
+  /**
+   * Vérifie qu’un ROLE_ETUDIANT ne lit que ses notes : claim id, sinon cohérence id demandé avec GET /etudiants/me.
+   */
+  private async assertEtudiantMayReadEtudiantId(
+    etudiantId: number,
+    user: Record<string, unknown>,
+    fwd: GatewayForwardHeaders | null,
+  ): Promise<void> {
+    if (!NotesService.realmRoles(user).includes('ROLE_ETUDIANT')) {
+      return;
+    }
+    const raw = user?.school_etudiant_id ?? user?.schoolEtudiantId;
+    const mine = raw != null && raw !== '' ? Number(raw) : NaN;
+    if (Number.isInteger(mine) && mine > 0) {
+      if (mine !== etudiantId) {
+        throw new ForbiddenException('Vous ne pouvez consulter que vos propres notes.');
+      }
+      return;
+    }
+    if (!fwd?.authorization?.trim()) {
+      throw new ForbiddenException(
+        'Token sans school_etudiant_id : impossible de vérifier votre identité pour cette ressource.',
+      );
+    }
+    let me: Record<string, unknown>;
+    try {
+      me = await this.gateway.getEtudiantMeJson(fwd);
+    } catch {
+      throw new ForbiddenException('Impossible de vérifier votre profil étudiant auprès de la gateway.');
+    }
+    const myId = Number(me.id);
+    if (!Number.isInteger(myId) || myId !== etudiantId) {
+      throw new ForbiddenException('Vous ne pouvez consulter que vos propres notes.');
+    }
+  }
+
+  private static positiveIntOrNull(v: unknown): number | null {
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }
+
+  private publishInscriptionCreated(doc: { etudiantId: number; matiereId: number; _id: unknown }) {
+    const pub = this.rabbit.publish('inscription.created', {
+      etudiantId: doc.etudiantId,
+      matiereId: doc.matiereId,
+      inscriptionId: String(doc._id),
+    });
+    if (pub) {
+      this.logger.log(
+        '[RabbitMQ — Scénario 2] Message "inscription.created" envoyé au broker → MSClasse pourra enregistrer le suivi pédagogique.',
+      );
+    }
+  }
+
+  /**
+   * Si aucune inscription n’existe encore, la crée lorsque l’élève et la matière sont dans la même classe
+   * (cohérence via la gateway : GET /etudiants/{id} et GET /matieres/{id}). L’accès à la matière repose sur le JWT
+   * (MSMatiere refuse aux enseignants une matière hors périmètre).
+   */
+  private async ensureInscriptionFromPedagogie(
+    etudiantId: number,
+    matiereId: number,
+    user: Record<string, unknown> | undefined,
+    fwd: GatewayForwardHeaders,
+  ): Promise<InscriptionDocument> {
+    if (!fwd.authorization?.trim()) {
+      throw new BadRequestException(
+        'Impossible de vérifier le rattachement élève/matière : en-tête Authorization manquant.',
+      );
+    }
+    let etuJson: Record<string, unknown>;
+    let matJson: Record<string, unknown>;
+    try {
+      etuJson = await this.gateway.getEtudiantJson(etudiantId, fwd);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.startsWith('ETUDIANT_404')) {
+        throw new NotFoundException('Étudiant introuvable.');
+      }
+      throw new BadRequestException('Impossible de charger la fiche étudiant (gateway).');
+    }
+    try {
+      matJson = await this.gateway.getMatiereJson(matiereId, fwd);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg === 'MATIERE_403') {
+        throw new ForbiddenException(
+          'Vous ne pouvez pas saisir de note pour cette matière (accès refusé ou matière hors de votre périmètre).',
+        );
+      }
+      if (msg.startsWith('MATIERE_404')) {
+        throw new NotFoundException('Matière introuvable.');
+      }
+      throw new BadRequestException('Impossible de charger la matière (gateway).');
+    }
+    const classeEtudiant = NotesService.positiveIntOrNull(etuJson.classeId);
+    const classeMatiere = NotesService.positiveIntOrNull(matJson.classeId);
+    if (classeEtudiant == null) {
+      throw new BadRequestException(
+        "L'étudiant n'est affecté à aucune classe : impossible d'associer automatiquement une matière.",
+      );
+    }
+    if (classeMatiere == null) {
+      throw new BadRequestException(
+        "La matière n'est pas rattachée à une classe : affectez la matière à la classe de l'élève côté référentiel.",
+      );
+    }
+    if (classeEtudiant !== classeMatiere) {
+      throw new BadRequestException(
+        "L'élève et la matière ne sont pas dans la même classe. Vérifiez l'affectation matière → classe.",
+      );
+    }
+    const enseignantUsername =
+      NotesService.isEnseignant(user) && !NotesService.isChef(user)
+        ? (user?.preferred_username as string | undefined)
+        : undefined;
+    try {
+      const doc = await this.inscriptionModel.create({
+        etudiantId,
+        matiereId,
+        classeId: classeEtudiant,
+        enseignantUsername,
+      });
+      this.publishInscriptionCreated(doc);
+      return doc;
+    } catch (e: unknown) {
+      const code = (e as { code?: number }).code;
+      if (code === 11000) {
+        const existing = await this.inscriptionModel.findOne({ etudiantId, matiereId }).exec();
+        if (existing) {
+          return existing;
+        }
+      }
+      throw e;
+    }
   }
 
   async affecterEtudiantMatiere(dto: CreateInscriptionDto, user?: Record<string, unknown>) {
@@ -76,16 +246,7 @@ export class NotesService {
         classeId: dto.classeId,
         enseignantUsername,
       });
-      const pub = this.rabbit.publish('inscription.created', {
-        etudiantId: doc.etudiantId,
-        matiereId: doc.matiereId,
-        inscriptionId: String(doc._id),
-      });
-      if (pub) {
-        this.logger.log(
-          '[RabbitMQ — Scénario 2] Message "inscription.created" envoyé au broker → MSClasse pourra enregistrer le suivi pédagogique.',
-        );
-      }
+      this.publishInscriptionCreated(doc);
       return doc.toJSON();
     } catch (e: unknown) {
       const code = (e as { code?: number }).code;
@@ -103,17 +264,24 @@ export class NotesService {
     }
   }
 
-  async affecterNote(dto: CreateNoteDto, user?: Record<string, unknown>) {
-    const ins = await this.inscriptionModel
+  async affecterNote(
+    dto: CreateNoteDto,
+    user?: Record<string, unknown>,
+    fwd?: GatewayForwardHeaders,
+  ) {
+    let ins = await this.inscriptionModel
       .findOne({
         etudiantId: dto.etudiantId,
         matiereId: dto.matiereId,
       })
       .exec();
     if (!ins) {
-      throw new NotFoundException(
-        'Inscription étudiant/matière introuvable. Affectez d’abord l’étudiant à la matière.',
-      );
+      if (!fwd) {
+        throw new NotFoundException(
+          'Inscription étudiant/matière introuvable. Réessayez depuis le portail (jeton transmis) ou créez l’inscription via POST /notes/inscriptions.',
+        );
+      }
+      ins = await this.ensureInscriptionFromPedagogie(dto.etudiantId, dto.matiereId, user, fwd);
     }
     this.assertCanWriteNoteOnInscription(ins, user);
     const existing = await this.noteModel.findOne({ inscriptionId: ins._id }).exec();
@@ -222,13 +390,13 @@ export class NotesService {
     return out;
   }
 
-  async findMyNotes(user: Record<string, unknown>) {
-    const id = NotesService.etudiantIdFromUser(user);
+  async findMyNotes(user: Record<string, unknown>, fwd: GatewayForwardHeaders | null) {
+    const id = await this.resolveEtudiantIdForStudent(user, fwd);
     return this.consulterNotesEtudiant(id);
   }
 
-  async getStatsByEtudiant(user: Record<string, unknown>) {
-    const rows = await this.findMyNotes(user);
+  async getStatsByEtudiant(user: Record<string, unknown>, fwd: GatewayForwardHeaders | null) {
+    const rows = await this.findMyNotes(user, fwd);
     const valeurs: number[] = [];
     const parMatiere = new Map<number, number[]>();
     for (const r of rows as Array<{ matiereId: number; note: { valeur: number } | null }>) {
@@ -381,7 +549,11 @@ export class NotesService {
       .map((e, i) => ({ ...e, rang: i + 1 }));
   }
 
-  async createBulk(dto: CreateBulkNotesDto, user?: Record<string, unknown>) {
+  async createBulk(
+    dto: CreateBulkNotesDto,
+    user?: Record<string, unknown>,
+    fwd?: GatewayForwardHeaders,
+  ) {
     const out: unknown[] = [];
     for (const line of dto.notes) {
       const r = await this.affecterNote(
@@ -391,6 +563,7 @@ export class NotesService {
           valeur: line.valeur,
         },
         user,
+        fwd,
       );
       out.push(r);
     }
@@ -400,6 +573,15 @@ export class NotesService {
   async consulterNotesEtudiant(etudiantId: number) {
     const inscriptions = await this.inscriptionModel.find({ etudiantId }).exec();
     return this.buildRowsForInscriptions(inscriptions);
+  }
+
+  async consulterNotesEtudiantSecured(
+    etudiantId: number,
+    user: Record<string, unknown>,
+    fwd: GatewayForwardHeaders | null,
+  ) {
+    await this.assertEtudiantMayReadEtudiantId(etudiantId, user, fwd);
+    return this.consulterNotesEtudiant(etudiantId);
   }
 
   async consulterHistorique(etudiantId?: number) {

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <title>API Gateway — documentation (Twin6)</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"/>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js" crossorigin="anonymous"></script>
+<script>
+  /**
+   * Pas de configUrl : springdoc webflux-api n'expose pas /v3/api-docs/swagger-config (404).
+   * Liste explicite alignée sur application.yml (springdoc.swagger-ui.urls).
+   */
+  window.onload = function () {
+    window.ui = SwaggerUIBundle({
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      layout: 'StandaloneLayout',
+      urls: [
+        { url: '/v3/api-docs', name: 'API Gateway' },
+        { url: '/central-docs/MSEtudiant4twin6/v3/api-docs', name: 'MSEtudiant4twin6' },
+        { url: '/central-docs/MSClasse4twin6/v3/api-docs', name: 'MSClasse4twin6' },
+        { url: '/central-docs/MSMatiere4twin6/v3/api-docs', name: 'MSMatiere4twin6' },
+        { url: '/central-docs/MSSalle4twin6/v3/api-docs', name: 'MSSalle4twin6' },
+        { url: '/central-docs/MSEnseignant4twin6/v3/api-docs', name: 'MSEnseignant4twin6' },
+        { url: '/central-docs/MSNotes4twin6/v3/api-docs', name: 'MSNotes4twin6' }
+      ],
+      'urls.primaryName': 'API Gateway',
+      validatorUrl: null
+    });
+  };
+</script>
+</body>
+</html>

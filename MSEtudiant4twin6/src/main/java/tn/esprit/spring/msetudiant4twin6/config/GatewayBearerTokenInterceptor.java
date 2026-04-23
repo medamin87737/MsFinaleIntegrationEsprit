@@ -30,7 +30,7 @@ public class GatewayBearerTokenInterceptor implements ClientHttpRequestIntercept
 
     public GatewayBearerTokenInterceptor(
             OAuth2AuthorizedClientManager authorizedClientManager,
-            @Value("${app.gateway.base-url:http://localhost:8080}") String gatewayBase) {
+            @Value("${app.gateway.base-url:http://api-gateway:8080}") String gatewayBase) {
         this.authorizedClientManager = authorizedClientManager;
         this.gatewayBase = gatewayBase.endsWith("/") ? gatewayBase.substring(0, gatewayBase.length() - 1) : gatewayBase;
     }

@@ -1,8 +1,11 @@
 package tn.esprit.spring.msenseignant4twin6;
 
 import feign.FeignException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tn.esprit.spring.msenseignant4twin6.feign.EtudiantFeignClient;
+import tn.esprit.spring.msenseignant4twin6.keycloak.KeycloakUserProvisioningService;
 import tn.esprit.spring.msenseignant4twin6.feign.EtudiantSummary;
 import tn.esprit.spring.msenseignant4twin6.feign.MatiereFeignClient;
 import tn.esprit.spring.msenseignant4twin6.feign.MatiereRef;
@@ -19,14 +22,17 @@ public class EnseignantService implements IEnseignantService {
     private final EnseignantRepository repository;
     private final EtudiantFeignClient etudiantFeignClient;
     private final MatiereFeignClient matiereFeignClient;
+    private final ObjectProvider<KeycloakUserProvisioningService> keycloakProvisioning;
 
     public EnseignantService(
             EnseignantRepository repository,
             EtudiantFeignClient etudiantFeignClient,
-            MatiereFeignClient matiereFeignClient) {
+            MatiereFeignClient matiereFeignClient,
+            ObjectProvider<KeycloakUserProvisioningService> keycloakProvisioning) {
         this.repository = repository;
         this.etudiantFeignClient = etudiantFeignClient;
         this.matiereFeignClient = matiereFeignClient;
+        this.keycloakProvisioning = keycloakProvisioning;
     }
 
     @Override
@@ -72,27 +78,65 @@ public class EnseignantService implements IEnseignantService {
     }
 
     @Override
+    @Transactional
     public Enseignant create(Enseignant entity) {
         entity.setId(null);
-        return repository.save(entity);
+        Enseignant saved = repository.save(entity);
+        keycloakProvisioning.ifAvailable(
+                kc ->
+                        kc.syncEnseignant(
+                                saved.getMatricule(),
+                                saved.getPassword(),
+                                saved.getId(),
+                                saved.getRole() != null ? saved.getRole() : RoleEnseignant.ENSEIGNANT,
+                                true));
+        return saved;
     }
 
     @Override
+    @Transactional
     public Optional<Enseignant> update(Long id, Enseignant entity) {
-        return repository.findById(id).map(existing -> {
-            existing.setNom(entity.getNom());
-            existing.setDescription(entity.getDescription());
-            existing.setMatricule(entity.getMatricule());
-            if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
-                existing.setPassword(entity.getPassword());
-            }
-            existing.setRole(entity.getRole() != null ? entity.getRole() : RoleEnseignant.ENSEIGNANT);
-            return repository.save(existing);
-        });
+        return repository
+                .findById(id)
+                .map(
+                        existing -> {
+                            String oldMatricule = existing.getMatricule();
+                            existing.setNom(entity.getNom());
+                            existing.setDescription(entity.getDescription());
+                            existing.setMatricule(entity.getMatricule());
+                            if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
+                                existing.setPassword(entity.getPassword());
+                            }
+                            existing.setRole(
+                                    entity.getRole() != null ? entity.getRole() : RoleEnseignant.ENSEIGNANT);
+                            Enseignant saved = repository.save(existing);
+                            keycloakProvisioning.ifAvailable(
+                                    kc -> {
+                                        if (oldMatricule != null
+                                                && saved.getMatricule() != null
+                                                && !oldMatricule.equalsIgnoreCase(saved.getMatricule().trim())) {
+                                            kc.deleteByMatricule(oldMatricule);
+                                        }
+                                        kc.syncEnseignant(
+                                                saved.getMatricule(),
+                                                entity.getPassword(),
+                                                saved.getId(),
+                                                saved.getRole(),
+                                                false);
+                                    });
+                            return saved;
+                        });
     }
 
     @Override
+    @Transactional
     public void delete(Long id) {
-        repository.deleteById(id);
+        repository
+                .findById(id)
+                .ifPresent(
+                        e -> {
+                            keycloakProvisioning.ifAvailable(kc -> kc.deleteByMatricule(e.getMatricule()));
+                            repository.deleteById(id);
+                        });
     }
 }

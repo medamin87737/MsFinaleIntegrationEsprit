@@ -7,13 +7,16 @@ export const SCHOOL_EVENTS_EXCHANGE = 'school.events';
 const RECONNECT_MS = 15_000;
 
 @Injectable()
-export class RabbitMqPublisherService implements OnModuleInit, OnModuleDestroy {
+export class RabbitMqPublisherService implements OnModuleDestroy, OnModuleInit {
   private readonly logger = new Logger(RabbitMqPublisherService.name);
   private connection: amqp.ChannelModel | null = null;
   private channel: amqp.Channel | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private rabbitEnabled = false;
   private uri: string | null = null;
+  /** Évite de relancer une reconnexion pendant un close() volontaire (reconnect / shutdown). */
+  private suppressReconnect = false;
+  private shuttingDown = false;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -27,19 +30,54 @@ export class RabbitMqPublisherService implements OnModuleInit, OnModuleDestroy {
     await this.tryConnect();
   }
 
+  private wireConnectionEvents(conn: amqp.ChannelModel): void {
+    conn.on('error', (err: Error) => {
+      if (!this.shuttingDown) {
+        this.logger.warn(`RabbitMQ connexion — erreur: ${err.message}`);
+      }
+    });
+    conn.on('close', () => {
+      if (this.shuttingDown || this.suppressReconnect) {
+        return;
+      }
+      this.logger.warn(
+        `RabbitMQ connexion fermée par le broker ou le réseau — nouvelle tentative dans ${RECONNECT_MS / 1000} s.`,
+      );
+      this.channel = null;
+      this.connection = null;
+      this.scheduleReconnect();
+    });
+  }
+
   private async tryConnect(): Promise<void> {
     if (!this.uri) {
       return;
     }
+    this.suppressReconnect = true;
     await this.closeQuietly();
+    this.suppressReconnect = false;
     try {
       const conn = await amqp.connect(this.uri);
       this.connection = conn;
+      this.wireConnectionEvents(conn);
       const ch = await conn.createChannel();
       this.channel = ch;
+      ch.on('error', (err: Error) => {
+        if (!this.shuttingDown) {
+          this.logger.warn(`RabbitMQ canal — erreur: ${err.message}`);
+        }
+      });
+      ch.on('close', () => {
+        if (this.shuttingDown || this.suppressReconnect) {
+          return;
+        }
+        this.logger.warn('RabbitMQ canal fermé — reconnexion programmée.');
+        this.channel = null;
+        this.scheduleReconnect();
+      });
       await ch.assertExchange(SCHOOL_EVENTS_EXCHANGE, 'topic', { durable: true });
       this.logger.log(
-        `RabbitMQ connecté — exchange "${SCHOOL_EVENTS_EXCHANGE}" (127.0.0.1:5672 ou RABBITMQ_URI). Les logs "[RabbitMQ] Message envoyé" apparaîtront à chaque publication.`,
+        `RabbitMQ connecté — exchange "${SCHOOL_EVENTS_EXCHANGE}" (RABBITMQ_URI). Les logs "[RabbitMQ] Message envoyé" apparaîtront à chaque publication.`,
       );
       if (this.reconnectTimer != null) {
         clearTimeout(this.reconnectTimer);
@@ -56,7 +94,7 @@ export class RabbitMqPublisherService implements OnModuleInit, OnModuleDestroy {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer != null || !this.rabbitEnabled) {
+    if (this.reconnectTimer != null || !this.rabbitEnabled || this.shuttingDown) {
       return;
     }
     this.reconnectTimer = setTimeout(() => {
@@ -81,11 +119,14 @@ export class RabbitMqPublisherService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    this.shuttingDown = true;
     if (this.reconnectTimer != null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.suppressReconnect = true;
     await this.closeQuietly();
+    this.suppressReconnect = false;
   }
 
   /** Publie un événement métier (ne fait pas échouer l’API si RabbitMQ est down). @returns true si le message a été envoyé au broker */
@@ -110,7 +151,14 @@ export class RabbitMqPublisherService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[RabbitMQ] Message envoyé au broker — clé "${routingKey}".`);
       return true;
     } catch (err) {
-      this.logger.warn(`Publication RabbitMQ ignorée: ${(err as Error).message}`);
+      const msg = (err as Error).message;
+      this.logger.warn(`Publication RabbitMQ ignorée: ${msg}`);
+      this.channel = null;
+      if (!this.shuttingDown && /closed|ended|ECONNRESET|socket/i.test(msg)) {
+        this.logger.warn('Connexion broker invalide après publication — reconnexion programmée.');
+        this.connection = null;
+        this.scheduleReconnect();
+      }
       return false;
     }
   }

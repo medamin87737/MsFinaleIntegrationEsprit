@@ -1,7 +1,5 @@
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import { publicClient } from '../../api/client';
-import { MatieresAffectationCard, SallesAvecMatieresCard } from '../../components/MatiereSalleCards';
 
 export default function MatieresPage() {
   const { etudiant } = useAuth();
@@ -10,9 +8,7 @@ export default function MatieresPage() {
   return (
     <>
       <h1 className="page-title">Mes matières</h1>
-      <p className="page-desc">
-        Matières liées à vos inscriptions (agrégation MSNotes / MSMatière au moment de la connexion).
-      </p>
+      <p className="page-desc">Liste de vos matières.</p>
 
       <motion.div
         className="card"
@@ -25,7 +21,13 @@ export default function MatieresPage() {
             {list.map((m) => (
               <li key={m.id} style={{ marginBottom: '0.65rem' }}>
                 <strong>{m.nom}</strong>
-                <span style={{ color: 'var(--muted)', fontSize: '0.88rem' }}> · id {m.id}</span>
+                <div style={{ marginTop: '0.2rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                  {m.enseignantNom ? `Prof: ${m.enseignantNom}` : 'Prof: non affecté'} ·{' '}
+                  {m.salleId != null ? 'Salle affectée' : 'Salle non affectée'} ·{' '}
+                  {m.heureDebutSeance && m.heureFinSeance
+                    ? `${m.heureDebutSeance} - ${m.heureFinSeance}`
+                    : 'Créneau non défini'}
+                </div>
                 {m.description ? (
                   <div style={{ marginTop: '0.25rem', color: 'var(--muted)', fontSize: '0.95rem' }}>
                     {m.description}
@@ -41,8 +43,6 @@ export default function MatieresPage() {
         )}
       </motion.div>
 
-      <MatieresAffectationCard client={publicClient} title="Carte matière → salle et temps de séance" />
-      <SallesAvecMatieresCard client={publicClient} title="Carte salle → matières et horaires" />
     </>
   );
 }

@@ -1,34 +1,258 @@
-/* Thème aligné sur le portail Twin6 (accent #d7263d, fond clair) */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
+
+:root {
+  --t6-bg: #f8f6f6;
+  --t6-white: #ffffff;
+  --t6-ink: #121212;
+  --t6-muted: #5f5f5f;
+  --t6-line: rgba(18, 18, 18, 0.1);
+  --t6-accent: #d7263d;
+  --t6-accent-dark: #8b1022;
+  --t6-accent-soft: rgba(215, 38, 61, 0.14);
+}
+
 body.login-pf {
-  background: linear-gradient(160deg, #f8f6f6 0%, #fff5f5 45%, #f8f6f6 100%) !important;
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  color: var(--t6-ink);
+  background: var(--t6-bg) !important;
 }
 
-.pf-v5-c-login__main {
-  border-radius: 18px;
-  box-shadow: 0 22px 50px rgba(18, 18, 18, 0.1);
-  border: 1px solid rgba(18, 18, 18, 0.08);
+.login-pf-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(360px, 46vw) 1fr;
+  background: var(--t6-white);
 }
 
-.pf-v5-c-login__header {
-  border-bottom: 1px solid rgba(215, 38, 61, 0.15);
+/* Left side: branding panel */
+#kc-header.login-pf-page-header {
+  position: relative;
+  margin: 0;
+  padding: 3.2rem 2.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.2), transparent 32%),
+    radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.14), transparent 28%),
+    linear-gradient(145deg, #b11227 0%, #d7263d 42%, #8b1022 100%);
+  overflow: hidden;
 }
 
-.pf-v5-c-login__title {
+#kc-header.login-pf-page-header::before {
+  content: '';
+  position: absolute;
+  inset: -10% -20%;
+  background:
+    radial-gradient(circle at 75% 25%, rgba(255, 255, 255, 0.12), transparent 30%),
+    repeating-linear-gradient(
+      122deg,
+      transparent 0,
+      transparent 34px,
+      rgba(255, 255, 255, 0.08) 35px,
+      rgba(255, 255, 255, 0.08) 37px
+    );
+  pointer-events: none;
+}
+
+#kc-header-wrapper {
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+  color: #fff !important;
+  text-align: left;
+  text-transform: none !important;
+  font-family: 'Outfit', 'DM Sans', system-ui, sans-serif !important;
+  font-size: clamp(2rem, 3.2vw, 3rem);
   font-weight: 700 !important;
+  line-height: 1.05;
   letter-spacing: -0.02em;
+  white-space: normal !important;
+  padding-top: 4.3rem;
 }
 
-.pf-v5-c-button.pf-m-primary,
-.pf-v5-c-button.pf-m-primary:hover {
-  background: linear-gradient(135deg, #d7263d 0%, #a01828 100%) !important;
-  border-color: #8b1022 !important;
-  box-shadow: 0 10px 28px rgba(215, 38, 61, 0.35);
+#kc-header-wrapper::before {
+  content: 'T6';
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  color: #fff;
+  font-family: 'Outfit', 'DM Sans', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  backdrop-filter: blur(3px);
 }
 
+#kc-header-wrapper::after {
+  content: 'Plateforme academique Twin6 Campus. Connectez-vous avec votre matricule pour acceder a votre espace enseignant ou etudiant en toute securite.';
+  display: block;
+  margin-top: 1.25rem;
+  max-width: 36ch;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  font-size: 1.03rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0;
+}
+
+/* Right side: auth area */
+.card-pf {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  padding: 2.2rem 3rem;
+}
+
+#kc-content {
+  width: min(640px, 100%);
+}
+
+#kc-content-wrapper {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.login-pf-header {
+  margin: 0;
+  padding: 0 0 1.25rem;
+  text-align: center;
+  border-bottom: 0;
+}
+
+.login-pf-header::before {
+  content: none;
+}
+
+#kc-page-title {
+  display: none !important;
+}
+
+#kc-form {
+  padding: 0;
+}
+
+#kc-form-wrapper {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.login-pf .form-group label,
+.pf-c-form__label,
+.pf-v5-c-form__label {
+  color: var(--t6-muted) !important;
+  font-weight: 600 !important;
+  font-size: 0.84rem !important;
+  letter-spacing: 0.01em;
+}
+
+.login-pf input[type='text'],
+.login-pf input[type='password'],
+#username,
+#password,
+.pf-c-form-control,
 .pf-v5-c-form-control {
-  border-radius: 10px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--t6-line) !important;
+  min-height: 46px;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  box-shadow: none !important;
 }
 
-.pf-v5-c-login__footer {
-  color: #5c5c5c;
+.login-pf input:focus,
+#username:focus,
+#password:focus,
+.pf-c-form-control:focus,
+.pf-v5-c-form-control:focus {
+  border-color: var(--t6-accent) !important;
+  box-shadow: 0 0 0 3px var(--t6-accent-soft) !important;
+}
+
+#kc-form-buttons {
+  margin-top: 1.2rem;
+}
+
+#kc-login,
+.login-pf .btn-primary,
+.pf-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-primary {
+  width: 100%;
+  border: 1px solid var(--t6-accent-dark) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, var(--t6-accent) 0%, var(--t6-accent-dark) 100%) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
+  min-height: 46px;
+  box-shadow: 0 12px 28px rgba(215, 38, 61, 0.34);
+}
+
+#kc-login:hover,
+#kc-login:focus,
+.login-pf .btn-primary:hover,
+.login-pf .btn-primary:focus,
+.pf-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:hover {
+  background: linear-gradient(135deg, #e53851 0%, #7d0d1f 100%) !important;
+}
+
+.login-pf a,
+#kc-form-options a,
+#kc-info a {
+  color: var(--t6-accent) !important;
+  font-weight: 500;
+}
+
+.alert-error,
+.alert-danger,
+#input-error {
+  border-radius: 12px !important;
+}
+
+@media (max-width: 980px) {
+  .login-pf-page {
+    grid-template-columns: 1fr;
+  }
+
+  #kc-header.login-pf-page-header {
+    min-height: 240px;
+    padding: 2rem 1.4rem;
+  }
+
+  #kc-header-wrapper {
+    text-align: center;
+    font-size: clamp(1.7rem, 5.4vw, 2.2rem);
+  }
+
+  #kc-header-wrapper::after {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .card-pf {
+    min-height: auto;
+    padding: 1.2rem 1rem 2rem;
+  }
+
+  #kc-content {
+    width: min(560px, 100%);
+  }
 }

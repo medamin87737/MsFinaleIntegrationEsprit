@@ -12,5 +12,9 @@ export function allKeycloakRoles(user: Record<string, unknown> | undefined): str
       v?.roles?.forEach((r) => out.add(r));
     }
   }
-  return [...out];
+  const list = [...out];
+  if (list.includes('ROLE_ADMIN') && !list.includes('ROLE_CHEF_ENSEIGNANT')) {
+    list.push('ROLE_CHEF_ENSEIGNANT');
+  }
+  return list;
 }

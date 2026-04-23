@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { applySpringCloudEnv } from './config-server.bootstrap';
 import { AppModule } from './app.module';
 import { ForbiddenJsonFilter } from './auth/forbidden-json.filter';
@@ -16,6 +17,17 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('MSNotes4twin6 API')
+    .setDescription('API de gestion des notes')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('swagger-ui.html', app, swaggerDocument, {
+    jsonDocumentUrl: '/v3/api-docs',
+  });
 
   const port = Number(process.env.PORT) || 8088;
   await app.listen(port);

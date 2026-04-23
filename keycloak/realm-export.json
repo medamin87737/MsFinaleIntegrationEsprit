@@ -37,6 +37,14 @@
         "containerId": "school-realm"
       },
       {
+        "id": "realm-role-admin",
+        "name": "ROLE_ADMIN",
+        "description": "Administrateur applicatif — mêmes droits que Chef Enseignant côté API",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "school-realm"
+      },
+      {
         "id": "realm-role-offline",
         "name": "offline_access",
         "composite": false,
@@ -147,7 +155,7 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "secret": "schoolGatewaySecretDev2024",
-      "redirectUris": ["http://localhost:8080/*"],
+      "redirectUris": ["http://localhost:8087/*"],
       "webOrigins": ["*"],
       "notBefore": 0,
       "bearerOnly": false,
@@ -177,6 +185,31 @@
     }
   ],
   "users": [
+    {
+      "id": "user-admin-test",
+      "username": "admin.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Test",
+      "email": "admin@school.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_ADMIN",
+        "offline_access",
+        "uma_authorization"
+      ],
+      "attributes": {
+        "schoolEnseignantId": ["1"]
+      },
+      "requiredActions": []
+    },
     {
       "id": "user-chef-test",
       "username": "chef.test",

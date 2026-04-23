@@ -2,6 +2,7 @@ package tn.esprit.spring.msclasse4twin6.pedagogie;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
  * Affiche dans la console au démarrage où écouter les logs RabbitMQ (Scénario 2).
  */
 @Component
+@ConditionalOnProperty(name = "app.rabbitmq.enabled", havingValue = "true", matchIfMissing = false)
 public class RabbitMqConsumerReadyInfo {
 
     private static final Logger log = LoggerFactory.getLogger(RabbitMqConsumerReadyInfo.class);

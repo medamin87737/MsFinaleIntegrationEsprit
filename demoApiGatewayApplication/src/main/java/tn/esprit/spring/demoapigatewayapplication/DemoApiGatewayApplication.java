@@ -33,6 +33,9 @@ public class DemoApiGatewayApplication {
                 .route("central-docs-MSEnseignant4twin6", r -> r.path("/central-docs/MSEnseignant4twin6/**")
                         .filters(f -> f.rewritePath("/central-docs/MSEnseignant4twin6/(?<path>.*)", "/${path}"))
                         .uri("lb://MSEnseignant4twin6"))
+                .route("central-docs-MSNotes4twin6", r -> r.path("/central-docs/MSNotes4twin6/**")
+                        .filters(f -> f.rewritePath("/central-docs/MSNotes4twin6/(?<path>.*)", "/${path}"))
+                        .uri("lb://MSNotes4twin6"))
                 .route("etudiants_route", r -> r.path("/etudiants/**")
                         .uri("lb://MSEtudiant4twin6"))
                 .route("enseignants_route", r -> r.path("/enseignants/**")
@@ -43,6 +46,9 @@ public class DemoApiGatewayApplication {
                         .uri("lb://MSMatiere4twin6"))
                 .route("salles_route", r -> r.path("/salles/**")
                         .uri("lb://MSSalle4twin6"))
+                /* Route exacte /notes (POST note) + sous-chemins ; certains matchers /** n’incluent pas /notes sans slash final */
+                .route("notes_root", r -> r.path("/notes")
+                        .uri("lb://MSNotes4twin6"))
                 .route("notes_route", r -> r.path("/notes/**")
                         .uri("lb://MSNotes4twin6"))
         .build();

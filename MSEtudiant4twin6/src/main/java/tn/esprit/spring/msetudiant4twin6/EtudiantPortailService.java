@@ -30,7 +30,7 @@ public class EtudiantPortailService {
 
     private final RestTemplate restTemplate;
 
-    @Value("${app.gateway.base-url:http://localhost:8080}")
+    @Value("${app.gateway.base-url:http://api-gateway:8080}")
     private String gatewayBase;
 
     public EtudiantPortailService(RestTemplate restTemplate) {

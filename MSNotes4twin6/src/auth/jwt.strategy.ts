@@ -11,6 +11,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       process.env.KEYCLOAK_ISSUER ??
       config.get<string>('KEYCLOAK_ISSUER') ??
       'http://localhost:8180/realms/school-realm';
+    const jwksUri =
+      process.env.KEYCLOAK_JWKS_URI?.trim() ||
+      `${issuer.replace(/\/$/, '')}/protocol/openid-connect/certs`;
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -21,7 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         cache: true,
         rateLimit: true,
         jwksRequestsPerMinute: 10,
-        jwksUri: `${issuer}/protocol/openid-connect/certs`,
+        jwksUri,
       }),
     });
   }

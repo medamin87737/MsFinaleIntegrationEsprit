@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +38,12 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
             return Collections.emptyList();
         }
         List<String> roles = (List<String>) realmAccess.getOrDefault("roles", List.of());
-        return roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList());
+        List<GrantedAuthority> authorities = roles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toCollection(ArrayList::new));
+        if (roles.contains("ROLE_ADMIN") && !roles.contains("ROLE_CHEF_ENSEIGNANT")) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_CHEF_ENSEIGNANT"));
+        }
+        return authorities;
     }
 }

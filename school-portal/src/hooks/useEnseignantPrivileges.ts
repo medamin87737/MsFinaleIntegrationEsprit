@@ -8,9 +8,12 @@ import type { EnseignantRoleLabel } from '../types';
  * - Notes : lecture Enseignant + Chef ; écritures → Enseignant uniquement.
  */
 export function useEnseignantPrivileges() {
-  const { enseignant } = useAuth();
+  const { enseignant, hasRole } = useAuth();
   const role = (enseignant?.role ?? 'Enseignant') as EnseignantRoleLabel;
-  const isChef = role === 'Chef Enseignant';
+  const tokenIsChef = hasRole('ROLE_CHEF_ENSEIGNANT') || hasRole('ROLE_ADMIN');
+  const tokenIsEnseignant = hasRole('ROLE_ENSEIGNANT');
+  const isChef = role === 'Chef Enseignant' || role === 'Administrateur' || tokenIsChef;
+  const canReadNotes = tokenIsChef || tokenIsEnseignant;
 
   return {
     role,
@@ -18,8 +21,10 @@ export function useEnseignantPrivileges() {
     isEnseignantSeul: role === 'Enseignant',
     /** POST / PUT / DELETE sur étudiants, classes, matières, salles, enseignants */
     canManageRefData: isChef,
+    /** GET /notes/** (historique, stats…) */
+    canReadNotes,
     /** POST / PUT sur /notes (inscriptions, notes) */
-    canWriteNotes: role === 'Enseignant',
+    canWriteNotes: tokenIsEnseignant && !tokenIsChef,
     /** GET /enseignants (liste) — Chef uniquement côté API */
     canListAllEnseignants: isChef,
   };

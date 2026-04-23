@@ -51,15 +51,30 @@ export function startEurekaClient(options: EurekaRegisterOptions): Eureka {
     },
   });
 
-  client.start((err?: Error) => {
-    if (err) {
+  const maxRetryDelayMs = 15_000;
+  const baseRetryDelayMs = 2_000;
+  let attempt = 0;
+
+  const startWithRetry = () => {
+    client.start((err?: Error) => {
+      if (!err) {
+        attempt = 0;
+        // eslint-disable-next-line no-console
+        console.log(`Eureka: registered ${options.appName} at ${ip}:${options.port}`);
+        return;
+      }
+
+      attempt += 1;
+      const nextDelay = Math.min(baseRetryDelayMs * attempt, maxRetryDelayMs);
       // eslint-disable-next-line no-console
-      console.error('Eureka registration failed:', err.message);
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(`Eureka: registered ${options.appName} at ${ip}:${options.port}`);
-    }
-  });
+      console.error(
+        `Eureka registration failed: ${err.message}. Retry #${attempt} in ${nextDelay}ms.`,
+      );
+      setTimeout(startWithRetry, nextDelay);
+    });
+  };
+
+  startWithRetry();
 
   return client;
 }

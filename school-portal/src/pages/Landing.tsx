@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppCard } from '../components/ui/AppCard';
+import { DashboardSkeleton } from '../components/ui/Skeleton';
 import { useAuth } from '../context/AuthContext';
 
 const fade = {
@@ -13,9 +15,28 @@ const fade = {
 };
 
 export default function Landing() {
-  const { userKind, logout, isEtudiant, isEnseignant, getRoleLabel } = useAuth();
+  const navigate = useNavigate();
+  const { userKind, loading, logout, isEtudiant, isEnseignant, getRoleLabel } = useAuth();
   const canStudent = isEtudiant();
   const canStaff = isEnseignant();
+
+  /** Chef / enseignant → /enseignant ; étudiant → /etudiant (sans passer par les tuiles à chaque connexion). */
+  useEffect(() => {
+    if (loading) return;
+    if (userKind === 'enseignant') {
+      navigate('/enseignant', { replace: true });
+    } else if (userKind === 'etudiant') {
+      navigate('/etudiant', { replace: true });
+    }
+  }, [loading, userKind, navigate]);
+
+  if (loading) {
+    return (
+      <div className="landing-hero route-loading" aria-busy>
+        <DashboardSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="landing-hero">
@@ -79,7 +100,7 @@ export default function Landing() {
                   <p className="landing-tile__text">
                     {!canStaff
                       ? 'Votre session ne dispose pas des droits nécessaires pour cet espace.'
-                      : 'Classes, matières, salles et notes selon vos habilitations.'}
+                      : 'Classes, matières, salles et notes.'}
                   </p>
                 </div>
                 <span className="landing-tile__chev" aria-hidden>

@@ -17,6 +17,7 @@ import tn.esprit.spring.msclasse4twin6.dto.EmploiDuTempsDto;
 import tn.esprit.spring.msclasse4twin6.dto.PresenceDto;
 import tn.esprit.spring.msclasse4twin6.feign.EtudiantFeignClient;
 import tn.esprit.spring.msclasse4twin6.feign.EtudiantSummary;
+import tn.esprit.spring.msclasse4twin6.security.EnseignantIdResolver;
 import tn.esprit.spring.msclasse4twin6.security.SecurityUtils;
 
 import java.util.List;
@@ -29,14 +30,20 @@ public class ClasseController {
     private final IClasseService service;
     private final SecurityUtils securityUtils;
     private final EtudiantFeignClient etudiantFeignClient;
+    private final EnseignantIdResolver enseignantIdResolver;
 
     @Value("${welcome.message}")
     private String welcomeMessage;
 
-    public ClasseController(IClasseService service, SecurityUtils securityUtils, EtudiantFeignClient etudiantFeignClient) {
+    public ClasseController(
+            IClasseService service,
+            SecurityUtils securityUtils,
+            EtudiantFeignClient etudiantFeignClient,
+            EnseignantIdResolver enseignantIdResolver) {
         this.service = service;
         this.securityUtils = securityUtils;
         this.etudiantFeignClient = etudiantFeignClient;
+        this.enseignantIdResolver = enseignantIdResolver;
     }
 
     @GetMapping("/welcome")
@@ -45,7 +52,7 @@ public class ClasseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN')")
     public ResponseEntity<List<Classe>> getAll() {
         return ResponseEntity.ok(service.getAll());
     }
@@ -59,20 +66,21 @@ public class ClasseController {
     }
 
     @GetMapping("/mes-classes")
-    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN','ROLE_ENSEIGNANT')")
     public ResponseEntity<List<ClasseAvecMatieresDto>> getMesClasses() {
-        if (securityUtils.hasAuthority("ROLE_CHEF_ENSEIGNANT")) {
+        if (securityUtils.hasAuthority("ROLE_CHEF_ENSEIGNANT") || securityUtils.hasAuthority("ROLE_ADMIN")) {
             return ResponseEntity.ok(service.findAllAvecEmploi());
         }
-        Long ensId = securityUtils.getSchoolEnseignantId();
+        Long ensId = enseignantIdResolver.resolveOrNull();
         if (ensId == null) {
-            throw new AccessDeniedException("Identifiant enseignant (school_enseignant_id) manquant dans le token.");
+            // Compte enseignant sans claim métier : on évite un 403 en rafale côté front.
+            return ResponseEntity.ok(List.of());
         }
         return ResponseEntity.ok(service.findByEnseignantId(ensId));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN','ROLE_ENSEIGNANT')")
     public ResponseEntity<Page<Classe>> searchClasses(
             @RequestParam(required = false) String nom,
             @RequestParam(required = false) String niveau,
@@ -83,7 +91,11 @@ public class ClasseController {
             @RequestParam(defaultValue = "10") int size) {
         ClasseSearchCriteria criteria = new ClasseSearchCriteria(nom, niveau, filiere, jour, matiere);
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            criteria.setEnseignantId(securityUtils.getSchoolEnseignantId());
+            Long ensId = enseignantIdResolver.resolveOrNull();
+            if (ensId == null) {
+                return ResponseEntity.ok(Page.empty(PageRequest.of(page, size)));
+            }
+            criteria.setEnseignantId(ensId);
         }
         return ResponseEntity.ok(service.searchDynamic(criteria, PageRequest.of(page, size)));
     }
@@ -96,10 +108,10 @@ public class ClasseController {
     }
 
     @GetMapping("/{id:\\d+}/etudiants")
-    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN','ROLE_ENSEIGNANT')")
     public ResponseEntity<List<EtudiantSummary>> getEtudiants(@PathVariable Long id) {
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = enseignantIdResolver.resolveOrNull();
             if (ensId == null || !service.classeAppartientEnseignant(id, ensId)) {
                 throw new AccessDeniedException("Classe non assignée.");
             }
@@ -108,10 +120,10 @@ public class ClasseController {
     }
 
     @GetMapping("/{id:\\d+}/stats")
-    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN','ROLE_ENSEIGNANT')")
     public ResponseEntity<ClasseStatsDto> getStats(@PathVariable Long id) {
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = enseignantIdResolver.resolveOrNull();
             if (ensId == null || !service.classeAppartientEnseignant(id, ensId)) {
                 throw new AccessDeniedException("Classe non assignée.");
             }
@@ -120,10 +132,10 @@ public class ClasseController {
     }
 
     @GetMapping("/{id:\\d+}/presence")
-    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN','ROLE_ENSEIGNANT')")
     public ResponseEntity<PresenceDto> getPresence(@PathVariable Long id) {
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = enseignantIdResolver.resolveOrNull();
             if (ensId == null || !service.classeAppartientEnseignant(id, ensId)) {
                 throw new AccessDeniedException("Classe non assignée.");
             }
@@ -151,19 +163,19 @@ public class ClasseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN')")
     public ResponseEntity<Classe> create(@RequestBody Classe entity) {
         return ResponseEntity.ok(service.create(entity));
     }
 
     @PutMapping("/{id:\\d+}")
-    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN')")
     public ResponseEntity<Classe> update(@PathVariable Long id, @RequestBody Classe entity) {
         return service.update(id, entity).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id:\\d+}")
-    @PreAuthorize("hasAuthority('ROLE_CHEF_ENSEIGNANT')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

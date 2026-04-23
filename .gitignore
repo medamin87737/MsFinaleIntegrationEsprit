@@ -45,5 +45,5 @@ Thumbs.db
 **/Database/**/*.mv.db
 **/Database/**/*.trace.db
 
-# Docker / local volumes (si générés à la racine)
+# Overrides locaux optionnels
 *.local.yml

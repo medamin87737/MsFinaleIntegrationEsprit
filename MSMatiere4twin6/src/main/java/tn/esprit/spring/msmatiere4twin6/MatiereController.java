@@ -112,6 +112,7 @@ public class MatiereController {
     ) {
         return service.assignerSalle(
                         id,
+                        request.getEnseignantId(),
                         request.getSalleId(),
                         request.getClasseId(),
                         request.getHeureDebutSeance(),

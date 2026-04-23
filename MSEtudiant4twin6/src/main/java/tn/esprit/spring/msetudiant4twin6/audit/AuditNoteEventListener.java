@@ -3,6 +3,7 @@ package tn.esprit.spring.msetudiant4twin6.audit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import java.time.Instant;
 import static org.springframework.amqp.support.AmqpHeaders.RECEIVED_ROUTING_KEY;
 
 @Component
+@ConditionalOnProperty(name = "app.rabbitmq.enabled", havingValue = "true", matchIfMissing = false)
 public class AuditNoteEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(AuditNoteEventListener.class);

@@ -3,15 +3,16 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Param,
   ParseIntPipe,
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -20,11 +21,24 @@ import { CreateInscriptionDto } from './dto/create-inscription.dto';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { NotesService } from './notes.service';
+import { allKeycloakRoles } from '../auth/jwt-roles';
+import { GatewayForwardHeaders } from '../pedagogie/gateway-pedagogie.client';
 
 @Controller('notes')
 @UseGuards(RolesGuard)
 export class NotesController {
   constructor(private readonly notesService: NotesService) {}
+
+  /** Lit Authorization / X-Enseignant-Role de façon tolérante (casse des en-têtes, proxy Vite). */
+  private forwardHeadersFromRequest(req: Request): GatewayForwardHeaders {
+    const h = req.headers;
+    const authRaw = h['authorization'] ?? h['Authorization'];
+    const authorization = typeof authRaw === 'string' ? authRaw : Array.isArray(authRaw) ? authRaw[0] ?? '' : '';
+    const roleRaw = h['x-enseignant-role'] ?? h['X-Enseignant-Role'];
+    const xEnseignantRole =
+      typeof roleRaw === 'string' ? roleRaw : Array.isArray(roleRaw) ? roleRaw[0] : undefined;
+    return { authorization, xEnseignantRole };
+  }
 
   @Post('inscriptions')
   @Roles('ROLE_CHEF_ENSEIGNANT', 'ROLE_ENSEIGNANT')
@@ -40,20 +54,20 @@ export class NotesController {
 
   @Get('me')
   @Roles('ROLE_ETUDIANT')
-  findMyNotes(@CurrentUser() user: Record<string, unknown>) {
-    return this.notesService.findMyNotes(user);
+  findMyNotes(@CurrentUser() user: Record<string, unknown>, @Req() req: Request) {
+    return this.notesService.findMyNotes(user, this.forwardHeadersFromRequest(req));
   }
 
   @Get('me/stats')
   @Roles('ROLE_ETUDIANT')
-  getMyStats(@CurrentUser() user: Record<string, unknown>) {
-    return this.notesService.getStatsByEtudiant(user);
+  getMyStats(@CurrentUser() user: Record<string, unknown>, @Req() req: Request) {
+    return this.notesService.getStatsByEtudiant(user, this.forwardHeadersFromRequest(req));
   }
 
   @Get('classe/:classeId')
   @Roles('ROLE_CHEF_ENSEIGNANT', 'ROLE_ENSEIGNANT')
   findByClasse(@Param('classeId') classeId: string, @CurrentUser() user: Record<string, unknown>) {
-    const roles = (user?.realm_access as { roles?: string[] } | undefined)?.roles ?? [];
+    const roles = allKeycloakRoles(user);
     const isChef = roles.includes('ROLE_CHEF_ENSEIGNANT');
     return this.notesService.findByClasse(classeId, isChef ? null : (user.preferred_username as string));
   }
@@ -70,7 +84,7 @@ export class NotesController {
     @Query('notMax') notMax?: string,
     @CurrentUser() user?: Record<string, unknown>,
   ) {
-    const roles = (user?.realm_access as { roles?: string[] } | undefined)?.roles ?? [];
+    const roles = allKeycloakRoles(user);
     const isChef = roles.includes('ROLE_CHEF_ENSEIGNANT');
     return this.notesService.searchAdvanced({
       etudiantId,
@@ -99,7 +113,7 @@ export class NotesController {
   @Get('export/:classeId')
   @Roles('ROLE_CHEF_ENSEIGNANT', 'ROLE_ENSEIGNANT')
   exportNotes(@Param('classeId') classeId: string, @CurrentUser() user: Record<string, unknown>) {
-    const roles = (user?.realm_access as { roles?: string[] } | undefined)?.roles ?? [];
+    const roles = allKeycloakRoles(user);
     const isChef = roles.includes('ROLE_CHEF_ENSEIGNANT');
     return this.notesService.exportReleveNotes(
       classeId,
@@ -116,14 +130,14 @@ export class NotesController {
 
   @Post()
   @Roles('ROLE_CHEF_ENSEIGNANT', 'ROLE_ENSEIGNANT')
-  affecterNote(@Body() dto: CreateNoteDto, @CurrentUser() user: Record<string, unknown>) {
-    return this.notesService.affecterNote(dto, user);
+  affecterNote(@Body() dto: CreateNoteDto, @CurrentUser() user: Record<string, unknown>, @Req() req: Request) {
+    return this.notesService.affecterNote(dto, user, this.forwardHeadersFromRequest(req));
   }
 
   @Post('bulk')
   @Roles('ROLE_CHEF_ENSEIGNANT', 'ROLE_ENSEIGNANT')
-  createBulk(@Body() dto: CreateBulkNotesDto, @CurrentUser() user: Record<string, unknown>) {
-    return this.notesService.createBulk(dto, user);
+  createBulk(@Body() dto: CreateBulkNotesDto, @CurrentUser() user: Record<string, unknown>, @Req() req: Request) {
+    return this.notesService.createBulk(dto, user, this.forwardHeadersFromRequest(req));
   }
 
   @Put(':id')
@@ -147,15 +161,13 @@ export class NotesController {
   consulterNotesEtudiant(
     @Param('etudiantId', ParseIntPipe) etudiantId: number,
     @CurrentUser() user: Record<string, unknown>,
+    @Req() req: Request,
   ) {
-    const roles = (user?.realm_access as { roles?: string[] } | undefined)?.roles ?? [];
-    if (roles.includes('ROLE_ETUDIANT')) {
-      const mine = Number(user.school_etudiant_id);
-      if (!Number.isInteger(mine) || mine !== etudiantId) {
-        throw new ForbiddenException('Vous ne pouvez consulter que vos propres notes.');
-      }
-    }
-    return this.notesService.consulterNotesEtudiant(etudiantId);
+    return this.notesService.consulterNotesEtudiantSecured(
+      etudiantId,
+      user,
+      this.forwardHeadersFromRequest(req),
+    );
   }
 
   @Get('historique')

@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import tn.esprit.spring.msetudiant4twin6.security.EnseignantIdResolver;
 import tn.esprit.spring.msetudiant4twin6.security.SecurityUtils;
 
 import java.util.List;
@@ -17,13 +18,15 @@ public class EtudiantController {
 
     private final IEtudiantService service;
     private final SecurityUtils securityUtils;
+    private final EnseignantIdResolver enseignantIdResolver;
 
     @Value("${welcome.message}")
     private String welcomeMessage;
 
-    public EtudiantController(IEtudiantService service, SecurityUtils securityUtils) {
+    public EtudiantController(IEtudiantService service, SecurityUtils securityUtils, EnseignantIdResolver enseignantIdResolver) {
         this.service = service;
         this.securityUtils = securityUtils;
+        this.enseignantIdResolver = enseignantIdResolver;
     }
 
     @GetMapping("/welcome")
@@ -66,7 +69,7 @@ public class EtudiantController {
     @PreAuthorize("hasAnyAuthority('ROLE_CHEF_ENSEIGNANT','ROLE_ENSEIGNANT')")
     public ResponseEntity<List<Etudiant>> getEtudiantsByClasse(@PathVariable Long classeId) {
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = enseignantIdResolver.resolveOrNull();
             if (ensId == null || !service.classeAppartientEnseignant(classeId, ensId)) {
                 throw new AccessDeniedException("Cette classe ne vous est pas assignée.");
             }
@@ -87,7 +90,7 @@ public class EtudiantController {
                 throw new AccessDeniedException("Accès limité à votre propre fiche.");
             }
         } else if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = enseignantIdResolver.resolveOrNull();
             Etudiant target = service.getById(id).orElse(null);
             if (target == null || target.getClasseId() == null || ensId == null) {
                 throw new AccessDeniedException("Étudiant introuvable.");

@@ -3,12 +3,23 @@ export interface NotesInscriptionRow {
   inscriptionId?: string;
   etudiantId?: number;
   matiereId?: number;
+  classeId?: number;
   note?: { id?: string; valeur?: number; createdAt?: string; updatedAt?: string } | null;
 }
 
 export interface EtudiantPortail {
   classe: { id: number; nom: string; description?: string | null } | null;
-  matieres: { id: number; nom: string; description?: string | null }[];
+  matieres: {
+    id: number;
+    nom: string;
+    description?: string | null;
+    enseignantId?: number | null;
+    enseignantNom?: string | null;
+    classeId?: number | null;
+    salleId?: number | null;
+    heureDebutSeance?: string | null;
+    heureFinSeance?: string | null;
+  }[];
   notesInscriptions: NotesInscriptionRow[] | null;
 }
 
@@ -21,7 +32,7 @@ export interface EtudiantSession {
   portail?: EtudiantPortail | null;
 }
 
-export type EnseignantRoleLabel = 'Enseignant' | 'Chef Enseignant';
+export type EnseignantRoleLabel = 'Enseignant' | 'Chef Enseignant' | 'Administrateur';
 
 export interface EnseignantSession {
   id: number;

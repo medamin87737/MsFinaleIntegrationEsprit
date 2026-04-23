@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV_BASE: WorkspaceNavItem[] = [
   { to: '/enseignant', label: 'Accueil', end: true, icon: 'home' },
-  { to: '/enseignant/scenarios', label: 'Scénarios inter-MS', icon: 'spark' },
   { to: '/enseignant/etudiants', label: 'Étudiants', icon: 'users' },
   { to: '/enseignant/classes', label: 'Classes', icon: 'layers' },
   { to: '/enseignant/matieres', label: 'Matières', icon: 'book' },

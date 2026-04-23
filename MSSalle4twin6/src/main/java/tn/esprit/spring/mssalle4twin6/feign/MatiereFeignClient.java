@@ -14,4 +14,8 @@ public interface MatiereFeignClient {
 
     @GetMapping("/salle/{salleId}")
     List<MatiereSessionInfo> getBySalleId(@PathVariable("salleId") Long salleId);
+
+    /** Matières de l'enseignant connecté (JWT + rôle) — pour dériver les salles assignées. */
+    @GetMapping("/mes-matieres")
+    List<MatiereSessionInfo> getMesMatieres();
 }

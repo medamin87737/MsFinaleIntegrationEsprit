@@ -44,6 +44,28 @@ public class MatiereService implements IMatiereService {
         this.securityUtils = securityUtils;
     }
 
+    /**
+     * Identifiant métier enseignant : claim JWT {@code school_enseignant_id}, sinon résolution par
+     * {@code GET /enseignants/me} (matricule = preferred_username), aligné sur {@code EnseignantController}.
+     */
+    private Long resolveEnseignantBusinessId() {
+        Long id = securityUtils.getSchoolEnseignantId();
+        if (id != null) {
+            return id;
+        }
+        try {
+            List<EnseignantInfo> me = enseignantFeignClient.getMe();
+            if (me != null && !me.isEmpty() && me.get(0).getId() != null) {
+                return me.get(0).getId();
+            }
+        } catch (FeignException ignored) {
+            /* service indisponible ou 403/404 */
+        } catch (RuntimeException ignored) {
+            /* idem */
+        }
+        return null;
+    }
+
     /** Feign {@code GET /etudiants/me} : 404 si pas de fiche étudiant — ne pas propager en 500. */
     private Optional<EtudiantSummary> fetchEtudiantConnecte() {
         try {
@@ -69,21 +91,27 @@ public class MatiereService implements IMatiereService {
     @Override
     public Matiere create(Matiere entity) {
         entity.setId(null);
-        validateAssignation(entity.getSalleId(), entity.getClasseId(), entity.getHeureDebutSeance(), entity.getHeureFinSeance(), false);
+        validateAssignation(
+                entity.getEnseignantId(),
+                entity.getSalleId(),
+                entity.getClasseId(),
+                entity.getHeureDebutSeance(),
+                entity.getHeureFinSeance(),
+                false);
         return repository.save(entity);
     }
 
     @Override
     public Optional<Matiere> update(Long id, Matiere entity) {
         return repository.findById(id).map(existing -> {
-            validateAssignation(entity.getSalleId(), entity.getClasseId(), entity.getHeureDebutSeance(), entity.getHeureFinSeance(), false);
+            validateAssignation(entity.getEnseignantId(), entity.getSalleId(), entity.getClasseId(), entity.getHeureDebutSeance(), entity.getHeureFinSeance(), false);
             existing.setNom(entity.getNom());
             existing.setDescription(entity.getDescription());
-            existing.setSalleId(entity.getSalleId());
-            existing.setClasseId(entity.getClasseId());
-            existing.setEnseignantId(entity.getEnseignantId());
-            existing.setHeureDebutSeance(entity.getHeureDebutSeance());
-            existing.setHeureFinSeance(entity.getHeureFinSeance());
+            if (entity.getSalleId() != null) existing.setSalleId(entity.getSalleId());
+            if (entity.getClasseId() != null) existing.setClasseId(entity.getClasseId());
+            if (entity.getEnseignantId() != null) existing.setEnseignantId(entity.getEnseignantId());
+            if (entity.getHeureDebutSeance() != null) existing.setHeureDebutSeance(entity.getHeureDebutSeance());
+            if (entity.getHeureFinSeance() != null) existing.setHeureFinSeance(entity.getHeureFinSeance());
             return repository.save(existing);
         });
     }
@@ -100,6 +128,9 @@ public class MatiereService implements IMatiereService {
             return Optional.empty();
         }
         Matiere mat = matOpt.get();
+        if (mat.getEnseignantId() == null || !mat.getEnseignantId().equals(enseignantId)) {
+            return Optional.empty();
+        }
         try {
             EnseignantInfo ens = enseignantFeignClient.getById(enseignantId);
             MatiereAvecEnseignantDto dto = new MatiereAvecEnseignantDto();
@@ -149,7 +180,7 @@ public class MatiereService implements IMatiereService {
         if (securityUtils.hasAuthority("ROLE_CHEF_ENSEIGNANT")) {
             return repository.findAll();
         }
-        Long ensId = securityUtils.getSchoolEnseignantId();
+        Long ensId = resolveEnseignantBusinessId();
         if (ensId == null) {
             return List.of();
         }
@@ -174,7 +205,7 @@ public class MatiereService implements IMatiereService {
             return all;
         }
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = resolveEnseignantBusinessId();
             if (ensId == null) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Identifiant enseignant manquant dans le token.");
             }
@@ -201,7 +232,7 @@ public class MatiereService implements IMatiereService {
             return all;
         }
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = resolveEnseignantBusinessId();
             if (ensId == null) {
                 return List.of();
             }
@@ -223,7 +254,7 @@ public class MatiereService implements IMatiereService {
             return;
         }
         if (securityUtils.hasAuthority("ROLE_ENSEIGNANT")) {
-            Long ensId = securityUtils.getSchoolEnseignantId();
+            Long ensId = resolveEnseignantBusinessId();
             if (ensId != null && ensId.equals(m.getEnseignantId())) {
                 return;
             }
@@ -241,9 +272,10 @@ public class MatiereService implements IMatiereService {
     }
 
     @Override
-    public Optional<Matiere> assignerSalle(Long matiereId, Long salleId, Long classeId, LocalTime heureDebutSeance, LocalTime heureFinSeance) {
-        validateAssignation(salleId, classeId, heureDebutSeance, heureFinSeance, true);
+    public Optional<Matiere> assignerSalle(Long matiereId, Long enseignantId, Long salleId, Long classeId, LocalTime heureDebutSeance, LocalTime heureFinSeance) {
+        validateAssignation(enseignantId, salleId, classeId, heureDebutSeance, heureFinSeance, true);
         return repository.findById(matiereId).map(matiere -> {
+            matiere.setEnseignantId(enseignantId);
             matiere.setSalleId(salleId);
             matiere.setClasseId(classeId);
             matiere.setHeureDebutSeance(heureDebutSeance);
@@ -253,6 +285,7 @@ public class MatiereService implements IMatiereService {
     }
 
     private void validateAssignation(
+            Long enseignantId,
             Long salleId,
             Long classeId,
             LocalTime heureDebutSeance,
@@ -260,19 +293,31 @@ public class MatiereService implements IMatiereService {
             boolean strict
     ) {
         boolean nothingProvided =
-                salleId == null && classeId == null && heureDebutSeance == null && heureFinSeance == null;
+                enseignantId == null && salleId == null && classeId == null && heureDebutSeance == null && heureFinSeance == null;
         if (!strict && nothingProvided) {
             return;
         }
 
-        if (salleId == null || classeId == null || heureDebutSeance == null || heureFinSeance == null) {
+        if (enseignantId == null || salleId == null || classeId == null || heureDebutSeance == null || heureFinSeance == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "L'assignation complète exige salleId, classeId, heureDebutSeance et heureFinSeance."
+                    "L'assignation complète exige enseignantId, salleId, classeId, heureDebutSeance et heureFinSeance."
             );
         }
         if (!heureDebutSeance.isBefore(heureFinSeance)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'heure de début doit être strictement avant l'heure de fin.");
+        }
+
+        try {
+            enseignantFeignClient.getById(enseignantId);
+        } catch (FeignException e) {
+            if (e.status() == 404) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "L'enseignant " + enseignantId + " est introuvable pour l'assignation."
+                );
+            }
+            throw e;
         }
 
         try {

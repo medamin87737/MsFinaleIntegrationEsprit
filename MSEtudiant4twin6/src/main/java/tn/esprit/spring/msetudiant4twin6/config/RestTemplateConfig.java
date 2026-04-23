@@ -16,7 +16,7 @@ public class RestTemplateConfig {
     public RestTemplate restTemplate(
             RestTemplateBuilder builder,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            @Value("${app.gateway.base-url:http://localhost:8080}") String gatewayBase) {
+            @Value("${app.gateway.base-url:http://api-gateway:8080}") String gatewayBase) {
         return builder
                 .setConnectTimeout(Duration.ofSeconds(5))
                 .setReadTimeout(Duration.ofSeconds(20))

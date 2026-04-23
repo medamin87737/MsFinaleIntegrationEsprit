@@ -16,7 +16,7 @@ type MatiereRow = { id: number; nom?: string };
 export default function EnseignantScenariosPage() {
   const client = useEnseignantApi();
   const { enseignant } = useAuth();
-  const { isChef, canWriteNotes } = useEnseignantPrivileges();
+  const { isChef, canWriteNotes, canReadNotes } = useEnseignantPrivileges();
   const [checks, setChecks] = useState<Check[]>([]);
   const [loading, setLoading] = useState(false);
   const [globalErr, setGlobalErr] = useState<string | null>(null);
@@ -31,8 +31,10 @@ export default function EnseignantScenariosPage() {
       const next: Check[] = [];
 
       try {
-        const { data: classesData } = await client.get<Array<{ classeId?: number }>>('/classes/mes-classes');
-        const classes = Array.isArray(classesData) ? classesData : [];
+        const classesRes = await client.get<Array<{ classeId?: number }>>('/classes/mes-classes', {
+          validateStatus: (s) => s === 200 || s === 403,
+        });
+        const classes = classesRes.status === 200 && Array.isArray(classesRes.data) ? classesRes.data : [];
         const firstId = classes[0]?.classeId;
         if (firstId != null) {
           await client.get(`/classes/${firstId}/matieres-dediees`);
@@ -57,7 +59,8 @@ export default function EnseignantScenariosPage() {
       }
 
       try {
-        const { data: sallesData } = await client.get<SalleRow[]>('/salles');
+        const sallesPath = isChef ? '/salles' : '/salles/mes-salles';
+        const { data: sallesData } = await client.get<SalleRow[]>(sallesPath);
         const salles = Array.isArray(sallesData) ? sallesData : [];
         if (salles.length > 0) {
           await client.get(`/salles/${salles[0].id}/matieres-dediees`);
@@ -82,16 +85,31 @@ export default function EnseignantScenariosPage() {
       }
 
       try {
-        const matPath = isChef ? '/matieres' : '/matieres/mes-matieres';
+        const matPath = '/matieres/mes-matieres';
         const { data: matieresData } = await client.get<MatiereRow[]>(matPath);
         const matieres = Array.isArray(matieresData) ? matieresData : [];
-        if (matieres.length > 0 && enseignant?.id != null) {
-          await client.get(`/matieres/${matieres[0].id}/details-avec-enseignant/${enseignant.id}`);
+        if (isChef) {
           next.push({
             label: 'OpenFeign · Matière + enseignant',
-            status: 'ok',
-            detail: `GET ${matPath} puis /matieres/${matieres[0].id}/details-avec-enseignant/${enseignant.id}`,
+            status: 'skip',
+            detail: 'Vérification ciblée enseignant ignorée pour le compte Chef/Admin.',
           });
+        } else if (matieres.length > 0 && enseignant?.id != null) {
+          const detailsPath = `/matieres/${matieres[0].id}/details-avec-enseignant/${enseignant.id}`;
+          const res = await client.get(detailsPath, { validateStatus: (s) => s === 200 || s === 404 });
+          if (res.status === 200) {
+            next.push({
+              label: 'OpenFeign · Matière + enseignant',
+              status: 'ok',
+              detail: `GET ${matPath} puis ${detailsPath}`,
+            });
+          } else {
+            next.push({
+              label: 'OpenFeign · Matière + enseignant',
+              status: 'skip',
+              detail: `Endpoint non disponible pour ce couple matière/enseignant (${detailsPath}).`,
+            });
+          }
         } else {
           next.push({
             label: 'OpenFeign · Matière + enseignant',
@@ -107,18 +125,26 @@ export default function EnseignantScenariosPage() {
         });
       }
 
-      try {
-        await client.get('/notes/historique');
+      if (canReadNotes) {
+        try {
+          await client.get('/notes/historique');
+          next.push({
+            label: 'RabbitMQ · Historique notes (publisher MSNotes)',
+            status: 'ok',
+            detail: 'GET /notes/historique',
+          });
+        } catch (e) {
+          next.push({
+            label: 'RabbitMQ · Historique notes (publisher MSNotes)',
+            status: 'ko',
+            detail: errorMessage(e),
+          });
+        }
+      } else {
         next.push({
           label: 'RabbitMQ · Historique notes (publisher MSNotes)',
-          status: 'ok',
-          detail: 'GET /notes/historique',
-        });
-      } catch (e) {
-        next.push({
-          label: 'RabbitMQ · Historique notes (publisher MSNotes)',
-          status: 'ko',
-          detail: errorMessage(e),
+          status: 'skip',
+          detail: 'Token sans ROLE_ENSEIGNANT / ROLE_CHEF_ENSEIGNANT.',
         });
       }
 
@@ -174,7 +200,7 @@ export default function EnseignantScenariosPage() {
     return () => {
       cancelled = true;
     };
-  }, [client, enseignant?.id, isChef]);
+  }, [client, enseignant?.id, isChef, canReadNotes]);
 
   return (
     <>

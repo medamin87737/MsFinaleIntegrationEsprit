@@ -7,7 +7,6 @@ const NAV: WorkspaceNavItem[] = [
   { to: '/etudiant/classe', label: 'Classe', icon: 'layers' },
   { to: '/etudiant/matieres', label: 'Matières', icon: 'book' },
   { to: '/etudiant/notes', label: 'Notes', icon: 'chart' },
-  { to: '/etudiant/scenarios', label: 'Scénarios inter-MS', icon: 'spark' },
 ];
 
 export default function EtudiantLayout() {

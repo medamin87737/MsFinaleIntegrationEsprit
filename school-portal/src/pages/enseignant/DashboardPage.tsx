@@ -15,7 +15,7 @@ type MesClasseAgg = { classeId?: number };
 
 export default function EnseignantDashboard() {
   const client = useEnseignantApi();
-  const { isChef, canWriteNotes } = useEnseignantPrivileges();
+  const { isChef, canReadNotes } = useEnseignantPrivileges();
   const [stats, setStats] = useState<Stats | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -26,32 +26,48 @@ export default function EnseignantDashboard() {
       setErr(null);
       try {
         if (isChef) {
-          const [etu, cls, mat, sal, hist] = await Promise.all([
+          const [etu, cls, mat, sal] = await Promise.all([
             client.get<unknown[]>('/etudiants'),
             client.get<unknown[]>('/classes'),
             client.get<unknown[]>('/matieres'),
             client.get<unknown[]>('/salles'),
-            client.get<unknown[]>('/notes/historique'),
           ]);
+          let histCount = 0;
+          if (canReadNotes) {
+            try {
+              const hist = await client.get<unknown[]>('/notes/historique');
+              histCount = Array.isArray(hist.data) ? hist.data.length : 0;
+            } catch {
+              histCount = 0;
+            }
+          }
           if (cancelled) return;
           setStats({
             etudiants: Array.isArray(etu.data) ? etu.data.length : 0,
             classes: Array.isArray(cls.data) ? cls.data.length : 0,
             matieres: Array.isArray(mat.data) ? mat.data.length : 0,
             salles: Array.isArray(sal.data) ? sal.data.length : 0,
-            historique: Array.isArray(hist.data) ? hist.data.length : 0,
+            historique: histCount,
           });
           return;
         }
 
-        const [mesRes, mat, sal, hist] = await Promise.all([
-          client.get<MesClasseAgg[]>('/classes/mes-classes'),
+        const [mesRes, mat, sal] = await Promise.all([
+          client.get<MesClasseAgg[]>('/classes/mes-classes', { validateStatus: (s) => s === 200 || s === 403 }),
           client.get<unknown[]>('/matieres/mes-matieres'),
-          client.get<unknown[]>('/salles'),
-          client.get<unknown[]>('/notes/historique'),
+          client.get<unknown[]>('/salles/mes-salles'),
         ]);
+        let histCount = 0;
+        if (canReadNotes) {
+          try {
+            const hist = await client.get<unknown[]>('/notes/historique');
+            histCount = Array.isArray(hist.data) ? hist.data.length : 0;
+          } catch {
+            histCount = 0;
+          }
+        }
         if (cancelled) return;
-        const mesClasses = Array.isArray(mesRes.data) ? mesRes.data : [];
+        const mesClasses = mesRes.status === 200 && Array.isArray(mesRes.data) ? mesRes.data : [];
         let etuCount = 0;
         const seen = new Set<number>();
         for (const c of mesClasses) {
@@ -75,7 +91,7 @@ export default function EnseignantDashboard() {
           classes: mesClasses.length,
           matieres: Array.isArray(mat.data) ? mat.data.length : 0,
           salles: Array.isArray(sal.data) ? sal.data.length : 0,
-          historique: Array.isArray(hist.data) ? hist.data.length : 0,
+          historique: histCount,
         });
       } catch (e) {
         if (!cancelled) setErr(errorMessage(e));
@@ -84,41 +100,11 @@ export default function EnseignantDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [client, isChef]);
+  }, [client, isChef, canReadNotes]);
 
   return (
     <>
       <h1 className="page-title">Tableau de bord</h1>
-      <p className="page-desc">
-        Vue d’ensemble via la gateway (port 8080). Vos actions dans le menu correspondent à votre rôle
-        (Chef : référentiels + annuaire ; Enseignant : notes en écriture).
-      </p>
-      <div
-        className="card"
-        style={{
-          marginBottom: '1.25rem',
-          padding: '0.9rem 1.1rem',
-          background: 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
-        }}
-      >
-        <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--muted)', lineHeight: 1.5 }}>
-          {isChef && (
-            <>
-              <strong>Rôle Chef Enseignant :</strong> gestion des étudiants, classes, matières, salles et
-              annuaire enseignants ; lecture de l’historique des notes (pas de saisie de notes).
-            </>
-          )}
-          {!isChef && canWriteNotes && (
-            <>
-              <strong>Rôle Enseignant :</strong> consultation des référentiels ; inscriptions et saisie des
-              notes. Les modifications des fiches (étudiants, classes, …) sont réservées au Chef.
-            </>
-          )}
-          {!isChef && !canWriteNotes && (
-            <>Connectez-vous avec un compte enseignant pour voir les privilèges détaillés.</>
-          )}
-        </p>
-      </div>
       {err && <div className="alert alert-error">{err}</div>}
       {stats && (
         <div className="stat-grid">

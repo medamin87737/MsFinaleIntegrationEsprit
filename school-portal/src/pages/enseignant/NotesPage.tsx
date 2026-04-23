@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import PrivilegeHint from '../../components/PrivilegeHint';
 import { useEnseignantApi } from '../../hooks/useEnseignantApi';
 import { useEnseignantPrivileges } from '../../hooks/useEnseignantPrivileges';
 import { errorMessage } from '../../utils/errors';
@@ -31,7 +30,7 @@ type MatiereOpt = { id: number; nom: string };
 
 export default function NotesPage() {
   const client = useEnseignantApi();
-  const { canWriteNotes, isChef } = useEnseignantPrivileges();
+  const { canWriteNotes, isChef, canReadNotes } = useEnseignantPrivileges();
 
   const [historique, setHistorique] = useState<HistRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -42,8 +41,6 @@ export default function NotesPage() {
   const [etudiantOptions, setEtudiantOptions] = useState<EtudiantOpt[]>([]);
   const [matiereOptions, setMatiereOptions] = useState<MatiereOpt[]>([]);
 
-  const [insEtudiantId, setInsEtudiantId] = useState('');
-  const [insMatiereId, setInsMatiereId] = useState('');
   const [noteEtudiantId, setNoteEtudiantId] = useState('');
   const [noteMatiereId, setNoteMatiereId] = useState('');
   const [noteV, setNoteV] = useState('12');
@@ -75,17 +72,23 @@ export default function NotesPage() {
 
   const load = useCallback(async () => {
     if (!client) return;
+    if (!canReadNotes) {
+      setHistorique([]);
+      return;
+    }
     const { data } = await client.get<HistRow[]>('/notes/historique');
     setHistorique(Array.isArray(data) ? data : []);
-  }, [client]);
+  }, [client, canReadNotes]);
 
   const loadRefOptions = useCallback(async () => {
     if (!client) return;
     setRefBusy(true);
     try {
       if (canWriteNotes) {
-        const { data: mes } = await client.get<Array<{ classeId?: number }>>('/classes/mes-classes');
-        const classes = Array.isArray(mes) ? mes : [];
+        const mesRes = await client.get<Array<{ classeId?: number }>>('/classes/mes-classes', {
+          validateStatus: (s) => s === 200 || s === 403,
+        });
+        const classes = mesRes.status === 200 && Array.isArray(mesRes.data) ? mesRes.data : [];
         const merged: EtudiantOpt[] = [];
         const seen = new Set<number>();
         for (const c of classes) {
@@ -143,7 +146,7 @@ export default function NotesPage() {
     if (!client || !canWriteNotes) return;
     const etuId = Number(lookupEtudiantId);
     if (!lookupEtudiantId || !Number.isInteger(etuId) || etuId < 1) {
-      setErr('Choisissez un étudiant dans la liste, puis chargez ses inscriptions.');
+      setErr('Choisissez un étudiant dans la liste, puis chargez ses notes.');
       return;
     }
     setLookupBusy(true);
@@ -217,30 +220,6 @@ export default function NotesPage() {
     return [<option key="_" value="">Sélectionner…</option>, ...opts];
   }, [matiereOptions]);
 
-  async function submitInscription(e: FormEvent) {
-    e.preventDefault();
-    if (!client || !canWriteNotes) return;
-    const etudiantId = Number(insEtudiantId);
-    const matiereId = Number(insMatiereId);
-    if (!Number.isInteger(etudiantId) || etudiantId < 1 || !Number.isInteger(matiereId) || matiereId < 1) {
-      setErr('Choisissez un étudiant et une matière dans les listes.');
-      return;
-    }
-    setBusy(true);
-    setErr(null);
-    try {
-      await client.post('/notes/inscriptions', { etudiantId, matiereId });
-      setInsEtudiantId('');
-      setInsMatiereId('');
-      await load();
-      await reloadLookupRows();
-    } catch (ex) {
-      setErr(errorMessage(ex));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function submitNote(e: FormEvent) {
     e.preventDefault();
     if (!client || !canWriteNotes) return;
@@ -305,12 +284,12 @@ export default function NotesPage() {
   return (
     <>
       <h1 className="page-title">Notes</h1>
-      <p className="page-desc">
-        Même logique que le service MSNotes : lecture pour Enseignant et Chef ; inscriptions et saisie de
-        notes pour le rôle Enseignant uniquement.
-      </p>
-      {isChef && <PrivilegeHint variant="chefNotesReadOnly" />}
-      {canWriteNotes && <PrivilegeHint variant="enseignantNotes" />}
+      {!canReadNotes && (
+        <div className="alert alert-error">
+          Votre token Keycloak ne contient pas ROLE_ENSEIGNANT / ROLE_CHEF_ENSEIGNANT pour consulter
+          l&apos;historique des notes.
+        </div>
+      )}
       {err && <div className="alert alert-error">{err}</div>}
       {refBusy && canWriteNotes && (
         <p className="page-desc" style={{ marginTop: 0 }}>
@@ -323,39 +302,6 @@ export default function NotesPage() {
           <button type="button" className="btn btn-ghost btn-sm" disabled={refBusy} onClick={() => loadRefOptions()}>
             Recharger les listes étudiants / matières
           </button>
-        </div>
-      )}
-
-      {canWriteNotes && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', marginTop: 0 }}>Inscrire un étudiant à une matière</h3>
-          <form onSubmit={submitInscription} style={{ display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="ins-etu">Étudiant</label>
-              <select
-                id="ins-etu"
-                value={insEtudiantId}
-                onChange={(e) => setInsEtudiantId(e.target.value)}
-                required
-              >
-                {selectEtudiantItems}
-              </select>
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label htmlFor="ins-mat">Matière</label>
-              <select
-                id="ins-mat"
-                value={insMatiereId}
-                onChange={(e) => setInsMatiereId(e.target.value)}
-                required
-              >
-                {selectMatiereItems}
-              </select>
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={busy || refBusy}>
-              Inscrire
-            </button>
-          </form>
         </div>
       )}
 
@@ -409,7 +355,7 @@ export default function NotesPage() {
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginTop: 0 }}>Modifier une note existante</h3>
           <p style={{ margin: '0 0 0.75rem', color: 'var(--muted)', fontSize: '0.92rem' }}>
-            Choisissez un étudiant dans la liste, puis chargez ses inscriptions et notes.
+            Choisissez un étudiant dans la liste, puis chargez ses notes (par matière).
           </p>
           <div className="field" style={{ marginBottom: 0 }}>
             <label htmlFor="lookup-etu">Étudiant</label>
@@ -428,7 +374,7 @@ export default function NotesPage() {
           </div>
           <div style={{ marginTop: '0.65rem' }}>
             <button type="button" className="btn btn-primary btn-sm" disabled={lookupBusy} onClick={() => chargerInscriptions()}>
-              {lookupBusy ? 'Chargement…' : 'Charger les inscriptions'}
+              {lookupBusy ? 'Chargement…' : 'Charger les notes'}
             </button>
           </div>
 
@@ -470,7 +416,7 @@ export default function NotesPage() {
                 {lookupRows.length === 0 && !lookupBusy && (
                   <tr>
                     <td colSpan={4} style={{ color: 'var(--muted)' }}>
-                      Choisissez un étudiant, puis utilisez « Charger les inscriptions ».
+                      Choisissez un étudiant, puis utilisez « Charger les notes ».
                     </td>
                   </tr>
                 )}

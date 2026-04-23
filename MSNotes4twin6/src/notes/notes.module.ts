@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Inscription, InscriptionSchema } from './schemas/inscription.schema';
 import { Note, NoteSchema } from './schemas/note.schema';
 import { NoteHistorique, NoteHistoriqueSchema } from './schemas/note-historique.schema';
+import { GatewayPedagogieClient } from '../pedagogie/gateway-pedagogie.client';
 import { RabbitMqPublisherService } from '../rabbitmq/rabbitmq-publisher.service';
 import { NotesController } from './notes.controller';
 import { NotesService } from './notes.service';
@@ -16,6 +17,6 @@ import { NotesService } from './notes.service';
     ]),
   ],
   controllers: [NotesController],
-  providers: [NotesService, RabbitMqPublisherService],
+  providers: [NotesService, RabbitMqPublisherService, GatewayPedagogieClient],
 })
 export class NotesModule {}

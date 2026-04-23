@@ -31,8 +31,12 @@ public class GatewaySecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeExchange(ex -> ex
                         .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .pathMatchers("/actuator/prometheus", "/actuator/prometheus/**").permitAll()
-                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**")
+                        .pathMatchers(
+                                "/swagger-gateway.html",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/webjars/**")
                         .permitAll()
                         .pathMatchers(HttpMethod.GET, "/central-docs/**")
                         .permitAll()
@@ -86,6 +90,8 @@ public class GatewaySecurityConfig {
                         .hasAuthority("ROLE_CHEF_ENSEIGNANT")
 
                         // ── Salles ────────────────────────────────────────────────
+                        .pathMatchers(HttpMethod.GET, "/salles/mes-salles", "/salles/mes-salles/**")
+                        .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT")
                         .pathMatchers(HttpMethod.GET, "/salles/**")
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT", "ROLE_ETUDIANT")
                         .pathMatchers(HttpMethod.POST, "/salles/**")
@@ -132,13 +138,14 @@ public class GatewaySecurityConfig {
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT")
                         .pathMatchers(HttpMethod.GET, "/notes/classement/**")
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT")
-                        .pathMatchers(HttpMethod.GET, "/notes/**")
+                        /* /notes seul (POST création note, GET liste chef…) : /notes/** ne matche pas toujours l’absence de segment après /notes/ */
+                        .pathMatchers(HttpMethod.GET, "/notes", "/notes/**")
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT", "ROLE_ETUDIANT")
-                        .pathMatchers(HttpMethod.POST, "/notes/**")
+                        .pathMatchers(HttpMethod.POST, "/notes", "/notes/**")
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT")
-                        .pathMatchers(HttpMethod.PUT, "/notes/**")
+                        .pathMatchers(HttpMethod.PUT, "/notes", "/notes/**")
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT")
-                        .pathMatchers(HttpMethod.DELETE, "/notes/**")
+                        .pathMatchers(HttpMethod.DELETE, "/notes", "/notes/**")
                         .hasAnyAuthority("ROLE_CHEF_ENSEIGNANT", "ROLE_ENSEIGNANT")
 
                         .anyExchange()
@@ -152,7 +159,8 @@ public class GatewaySecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
-        c.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:8080"));
+        c.setAllowedOrigins(
+                List.of("http://localhost:5173", "http://localhost:8180", "http://localhost:8087"));
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         c.setAllowedHeaders(List.of("*"));
         c.setAllowCredentials(true);
